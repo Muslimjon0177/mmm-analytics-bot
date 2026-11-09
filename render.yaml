@@ -22,3 +22,5 @@ services:
         value: "production"
       - key: PORT
         value: "8000"
+      - key: WEB_APP_URL
+        value: "https://mmm-analytics-bot-vo52.onrender.com"
