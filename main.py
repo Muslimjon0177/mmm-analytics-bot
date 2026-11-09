@@ -4,6 +4,7 @@ import sys
 import logging
 import threading
 import signal
+import atexit
 from datetime import datetime
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp
