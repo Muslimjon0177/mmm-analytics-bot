@@ -242,6 +242,45 @@ def handle_group_message(message):
 
         logger.info(f"Guruhdan {len(result['records'])} ta yozuv saqlandi ({sender_name}). Guruhga xabar yozilmaydi.")
 
+        # Guruhga yozilmaydi (jim rejim), lekin ADMINGA shaxsiy chatida (lichkada) darhol xabar boradi:
+        if ADMIN_IDS:
+            summary_lines = []
+            for r in result["records"]:
+                cat = r.get("category", "")
+                if cat == "naqd":
+                    cat_badge = "🟢 Naqd"
+                elif cat == "nasiya":
+                    cat_badge = "🔴 Nasiya"
+                elif cat == "pul_keldi":
+                    cat_badge = "💰 Pul Keldi"
+                else:
+                    cat_badge = "📦 Kelim"
+
+                p_str = f"👤 <b>{r.get('partner_name')}</b>: " if r.get('partner_name') else ""
+                item_str = f"{r.get('quantity', '')} {r.get('unit', '') or ''} {r.get('item_name', '')}".strip()
+                tot_val = format_number(r.get('total_amount'))
+                tot_str = f" — <b>{tot_val} so'm</b>" if tot_val else ""
+                
+                usd_extra = ""
+                if r.get('currency') == "USD" and r.get('amount_usd'):
+                    usd_extra = f" (${format_number(r.get('amount_usd'))})"
+
+                summary_lines.append(f"{cat_badge}: {p_str}{item_str}{tot_str}{usd_extra}")
+
+            notif_text = (
+                f"📥 <b>Guruhdan yangi ma'lumot qabul qilindi:</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                + "\n".join(summary_lines) +
+                f"\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"✍️ <i>Yozuvchi: {sender_name}</i>\n"
+                f"💬 <i>Xabar: \"{text}\"</i>"
+            )
+            for admin_id in ADMIN_IDS:
+                try:
+                    bot.send_message(admin_id, notif_text)
+                except Exception as notify_err:
+                    logger.warning(f"Adminga bildirishnoma yuborishda: {notify_err}")
+
     except Exception as e:
         logger.error(f"Guruh xabarini tahlil qilishda xatolik: {e}")
 
