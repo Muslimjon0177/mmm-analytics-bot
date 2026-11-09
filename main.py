@@ -23,7 +23,10 @@ from database import (
     get_daily_summary,
     get_records_by_category,
     get_all_customers,
-    get_all_records_for_export
+    get_all_records_for_export,
+    delete_records_by_message,
+    recalculate_customer_balance,
+    recalculate_day_summary
 )
 from ai_parser import analyze_message
 from excel_export import create_excel_report
@@ -84,6 +87,7 @@ def get_main_menu() -> InlineKeyboardMarkup:
         InlineKeyboardButton("👥 Mijozlar Qarzi (CRM)", callback_data="report_customers")
     )
     markup.add(
+        InlineKeyboardButton("🔄 1 kunlik hisobotni yangilash", callback_data="refresh_today"),
         InlineKeyboardButton("📥 Excel yuklab olish (.xlsx)", callback_data="export_excel")
     )
     return markup
@@ -284,6 +288,110 @@ def handle_group_message(message):
     except Exception as e:
         logger.error(f"Guruh xabarini tahlil qilishda xatolik: {e}")
 
+# ----------------- GURUHDA TAHRIRLANGAN XABARLAR (EDITED MESSAGES) -----------------
+
+@bot.edited_message_handler(func=lambda m: m.chat.type in ['group', 'supergroup'], content_types=['text', 'photo', 'document'])
+def handle_edited_group_message(message):
+    text = (message.text or message.caption or "").strip()
+    if not text:
+        return
+
+    if ALLOWED_GROUP_IDS and message.chat.id not in ALLOWED_GROUP_IDS:
+        return
+
+    sender_name = message.from_user.full_name if message.from_user else "Noma'lum"
+
+    try:
+        # 1. Eski yozuvlarni topib o'chirish va mijoz balansini to'g'rilash
+        affected_partners = delete_records_by_message(message.chat.id, message.message_id)
+        for p in affected_partners:
+            recalculate_customer_balance(p)
+
+        # 2. Yangi tahrirlangan matnni qayta tahlil qilish
+        result = analyze_message(text)
+        if not result.get("is_relevant") or not result.get("records"):
+            if ADMIN_IDS:
+                for admin_id in ADMIN_IDS:
+                    try:
+                        bot.send_message(
+                            admin_id,
+                            f"✏️ <b>Guruhdagi xabar tahrirlandi (Savdo bekor qilindi):</b>\n"
+                            f"━━━━━━━━━━━━━━━━━━━━\n"
+                            f"💬 <i>Yangi matn: \"{text}\"</i>\n"
+                            f"✍️ <i>Yozuvchi: {sender_name}</i>\n"
+                            f"<i>Eski yozuv bazadan olib tashlandi va qarzlar to'g'rilandi.</i>"
+                        )
+                    except Exception:
+                        pass
+            return
+
+        # 3. Yangi yozuvlarni saqlash
+        new_partners = set()
+        for rec in result["records"]:
+            category = rec.get("category", "naqd")
+            item_name = rec.get("item_name")
+            quantity = rec.get("quantity")
+            unit = rec.get("unit")
+            price = rec.get("price")
+            total_amount = rec.get("total_amount")
+            partner_name = rec.get("partner_name")
+            currency = rec.get("currency", "UZS")
+            amount_usd = rec.get("amount_usd")
+
+            save_record(
+                category=category,
+                item_name=item_name,
+                quantity=quantity,
+                unit=unit,
+                price=price,
+                total_amount=total_amount,
+                partner_name=partner_name,
+                currency=currency,
+                amount_usd=amount_usd,
+                raw_message=text,
+                sender_name=sender_name,
+                chat_id=message.chat.id,
+                message_id=message.message_id
+            )
+            if partner_name:
+                new_partners.add(partner_name)
+
+        for p in new_partners:
+            recalculate_customer_balance(p)
+
+        logger.info(f"Guruhdagi xabar tahrirlandi va yangilandi: {len(result['records'])} ta yozuv ({sender_name})")
+
+        # 4. Adminga lichkada darhol yangilangan hisobotni xabar qilish
+        if ADMIN_IDS:
+            summary_lines = []
+            for r in result["records"]:
+                cat = r.get("category", "")
+                cat_badge = "🟢 Naqd" if cat == "naqd" else ("🔴 Nasiya" if cat == "nasiya" else "💰 Pul Keldi")
+                p_str = f"👤 <b>{r.get('partner_name')}</b>: " if r.get('partner_name') else ""
+                item_str = f"{r.get('quantity', '')} {r.get('unit', '') or ''} {r.get('item_name', '')}".strip()
+                tot_val = format_number(r.get('total_amount'))
+                tot_str = f" — <b>{tot_val} so'm</b>" if tot_val else ""
+                usd_extra = f" (${format_number(r.get('amount_usd'))})" if r.get('currency') == "USD" and r.get('amount_usd') else ""
+                summary_lines.append(f"{cat_badge}: {p_str}{item_str}{tot_str}{usd_extra}")
+
+            notif_text = (
+                f"✏️ <b>Guruhdagi xabar TAHRIRLANDI va bazada yangilandi!</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                + "\n".join(summary_lines) +
+                f"\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"✍️ <i>Yozuvchi: {sender_name}</i>\n"
+                f"💬 <i>Yangi matn: \"{text}\"</i>\n"
+                f"<i>Mijoz balansi va jami hisobotlar avtomatik to'g'rilandi.</i>"
+            )
+            for admin_id in ADMIN_IDS:
+                try:
+                    bot.send_message(admin_id, notif_text)
+                except Exception as notify_err:
+                    logger.warning(f"Adminga tahrir bildirishnoma yuborishda: {notify_err}")
+
+    except Exception as e:
+        logger.error(f"Tahrirlangan xabarni qayta ishlashda xatolik: {e}")
+
 # ----------------- SHAXSIY CHAT (LICHKA) -----------------
 
 @bot.message_handler(commands=['start', 'menu', 'app'], func=lambda m: m.chat.type == 'private')
@@ -344,6 +452,17 @@ def cmd_excel(message):
     bot.send_message(message.chat.id, "Excel fayli tayyorlanmoqda, kuting...")
     send_excel_report(message.chat.id)
 
+@bot.message_handler(commands=['yangilash', 'refresh'], func=lambda m: m.chat.type == 'private')
+def cmd_refresh(message):
+    if not is_admin(message.from_user.id): return
+    bot.send_message(message.chat.id, "🔄 1 kunlik barcha ma'lumotlar qayta hisoblanmoqda...")
+    recalculate_day_summary()
+    summary_text = (
+        "✅ <b>Bugungi kunlik ma'lumotlar qayta ko'rib chiqildi va yangilandi!</b>\n\n"
+        + generate_today_summary_text()
+    )
+    bot.send_message(message.chat.id, summary_text, reply_markup=get_main_menu())
+
 # ----------------- CALLBACK TUGMALAR -----------------
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -354,6 +473,14 @@ def handle_callbacks(call):
     if call.data == "report_today":
         bot.edit_message_text(generate_today_summary_text(), chat_id, message_id, reply_markup=get_main_menu())
         bot.answer_callback_query(call.id)
+    elif call.data == "refresh_today":
+        bot.answer_callback_query(call.id, "🔄 1 kunlik ma'lumotlar yangilanmoqda...")
+        recalculate_day_summary()
+        summary_text = (
+            "✅ <b>Bugungi kunlik hisobot qayta ko'rib chiqildi va yangilandi!</b>\n\n"
+            + generate_today_summary_text()
+        )
+        bot.edit_message_text(summary_text, chat_id, message_id, reply_markup=get_main_menu())
     elif call.data == "back_to_main":
         bot.edit_message_text(
             "📋 <b>Asosiy boshqaruv menyusi:</b>\nQuyidagi bo'limlardan birini tanlang:",

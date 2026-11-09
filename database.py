@@ -171,6 +171,83 @@ def update_customer_ledger(partner_name: str, category: str, amount: float):
     finally:
         client.close()
 
+def recalculate_customer_balance(partner_name: str):
+    """Mijozning haqiqiy yozuvlari asosida qarz balansini qayta aniq hisoblash"""
+    if not partner_name:
+        return
+    clean_display = normalize_partner_name(partner_name)
+    clean_key = clean_display.lower()
+    client = get_client()
+    try:
+        res = client.execute("""
+            SELECT 
+                COALESCE(SUM(CASE WHEN category = 'nasiya' THEN total_amount ELSE 0 END), 0) as total_credit,
+                COALESCE(SUM(CASE WHEN category IN ('pul_keldi', 'to\'lov') THEN total_amount ELSE 0 END), 0) as total_paid
+            FROM records
+            WHERE LOWER(partner_name) = ?
+        """, [clean_key])
+        
+        tot_cred = float(res.rows[0][0]) if res.rows else 0.0
+        tot_paid = float(res.rows[0][1]) if res.rows else 0.0
+        balance = tot_cred - tot_paid
+        
+        c_res = client.execute("SELECT id FROM customers WHERE name = ?", [clean_key])
+        if c_res.rows:
+            client.execute("""
+                UPDATE customers 
+                SET total_credit = ?, total_paid = ?, current_balance = ?, last_updated = CURRENT_TIMESTAMP
+                WHERE name = ?
+            """, [tot_cred, tot_paid, balance, clean_key])
+        else:
+            client.execute("""
+                INSERT INTO customers (name, display_name, total_credit, total_paid, current_balance, last_updated)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, [clean_key, clean_display, tot_cred, tot_paid, balance])
+            
+    except Exception as e:
+        logger.error(f"recalculate_customer_balance xatolik: {e}")
+    finally:
+        client.close()
+
+def delete_records_by_message(chat_id: int, message_id: int) -> List[str]:
+    """Tahrirlangan yoki o'chirilgan xabarning eski yozuvlarini o'chirish va ta'sirlangan mijozlarni qaytarish"""
+    affected_partners = set()
+    client = get_client()
+    try:
+        res = client.execute("SELECT partner_name FROM records WHERE chat_id = ? AND message_id = ?", [chat_id, message_id])
+        for row in res.rows:
+            if row[0]:
+                affected_partners.add(row[0])
+        
+        client.execute("DELETE FROM records WHERE chat_id = ? AND message_id = ?", [chat_id, message_id])
+        return list(affected_partners)
+    except Exception as e:
+        logger.error(f"delete_records_by_message xatolik: {e}")
+        return []
+    finally:
+        client.close()
+
+def recalculate_day_summary(target_date: Optional[str] = None) -> Dict[str, Any]:
+    """1 kunlik barcha ma'lumotlarni ko'rib chiqish va statistikani to'liq yangilash"""
+    if not target_date:
+        target_date = datetime.now().strftime("%Y-%m-%d")
+
+    client = get_client()
+    try:
+        partners_res = client.execute(
+            "SELECT DISTINCT partner_name FROM records WHERE date_str = ? AND partner_name IS NOT NULL",
+            [target_date]
+        )
+        for p in partners_res.rows:
+            if p[0]:
+                recalculate_customer_balance(p[0])
+    except Exception as e:
+        logger.error(f"recalculate_day_summary xatolik: {e}")
+    finally:
+        client.close()
+
+    return get_daily_summary(target_date)
+
 def save_record(
     category: str,
     item_name: Optional[str] = None,
