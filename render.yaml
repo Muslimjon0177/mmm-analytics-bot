@@ -1,16 +1,24 @@
 services:
   - type: web
-    name: telegram-warehouse-bot
-    env: python
+    name: mmm-analytics-bot
+    runtime: python
+    region: frankfurt
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
-    plan: free
+    healthCheckPath: /health
     envVars:
       - key: BOT_TOKEN
         sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: ADMIN_IDS
-        sync: false
-      - key: WEB_APP_URL
-        sync: false
+        value: "6656667725"
+      - key: NOTIFY_IN_GROUP
+        value: "false"
+      - key: BOT_MODE
+        value: "polling"
+      - key: ENVIRONMENT
+        value: "production"
+      - key: PORT
+        value: "8000"
