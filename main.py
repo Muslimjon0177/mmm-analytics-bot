@@ -1,6 +1,8 @@
 import io
 import os
 import sys
+import time
+import urllib.request
 import logging
 import threading
 import signal
@@ -507,6 +509,32 @@ def handle_callbacks(call):
 
 # ----------------- MAIN RUNNER -----------------
 
+def keep_alive_worker():
+    """Render bepul serverini doimo uyg'oq va issiq saqlash (Anti-sleep keep-alive).
+    Render 15 daqiqa harakatsizlikdan so'ng uxlaydi. Har 7 daqiqada ping yuborib serverni 24/7 uyg'oq tutamiz!"""
+    time.sleep(25)
+    while True:
+        try:
+            urls_to_ping = []
+            if CURRENT_WEB_APP_URL and "localhost" not in CURRENT_WEB_APP_URL:
+                urls_to_ping.append(f"{CURRENT_WEB_APP_URL.rstrip('/')}/health")
+            urls_to_ping.append(f"http://127.0.0.1:{PORT}/health")
+
+            for u in urls_to_ping:
+                try:
+                    req = urllib.request.Request(
+                        u,
+                        headers={"User-Agent": "MMM-Analytics-AntiSleep/1.0"}
+                    )
+                    with urllib.request.urlopen(req, timeout=12) as resp:
+                        pass
+                except Exception:
+                    pass
+            logger.info("Keep-alive ping yuborildi: server 24/7 faol va tezyurar holatda saqlanmoqda.")
+        except Exception as e:
+            logger.debug(f"Keep-alive ping xatoligi: {e}")
+        time.sleep(420)  # Har 7 daqiqa
+
 def setup_signal_handlers():
     def handle_shutdown(signum, frame):
         logger.info(f"Signal {signum} qabul qilindi. Jarayon xavfsiz to'xtatilmoqda...")
@@ -521,6 +549,10 @@ def main():
 
     logger.info("Ma'lumotlar bazasi sxemasi tekshirilmoqda...")
     init_db()
+
+    # Render bulut serverini 24/7 uyg'oq tutish (Keep-Alive Anti-Sleep):
+    keep_alive_thread = threading.Thread(target=keep_alive_worker, daemon=True)
+    keep_alive_thread.start()
 
     # Agar AUTO_TUNNEL yoqilgan bo'lsa (faqat lokal Windows rejimida):
     if AUTO_TUNNEL and ("localhost" in CURRENT_WEB_APP_URL or not CURRENT_WEB_APP_URL):

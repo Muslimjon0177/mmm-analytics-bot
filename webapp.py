@@ -171,6 +171,14 @@ def api_export_excel():
         logger.error(f"Excel eksportda xatolik: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.after_request
+def add_cache_headers(response):
+    if request.path.startswith("/static") or request.path == "/":
+        response.headers["Cache-Control"] = "public, max-age=120"
+    elif request.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
+
 def run_server(port=WEB_APP_PORT):
     """Flask WSGI serverini ishga tushirish"""
     import werkzeug.serving

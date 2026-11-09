@@ -7,6 +7,12 @@
   
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+    }
+  </script>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Chart.js CDN -->
@@ -391,38 +397,63 @@
       loadDashboardStats();
     }
 
+    function applyDashboardData(data) {
+      if (!data) return;
+      const kpi = data.kpi || {};
+
+      if (data.current_usd_rate) {
+        liveUsdRate = data.current_usd_rate;
+        const badge = document.getElementById('usd-rate-badge');
+        if (badge) badge.innerHTML = `<span>💵 1$ = ${formatNumber(liveUsdRate)} so'm (MB kursi)</span>`;
+      }
+
+      // KPI
+      const elNaqdSum = document.getElementById('kpi-naqd-sum');
+      const elNaqdCount = document.getElementById('kpi-naqd-count');
+      const elNasiyaSum = document.getElementById('kpi-nasiya-sum');
+      const elNasiyaCount = document.getElementById('kpi-nasiya-count');
+      const elPaidSum = document.getElementById('kpi-paid-sum');
+      const elPaidCount = document.getElementById('kpi-paid-count');
+      const elDebtSum = document.getElementById('kpi-debt-sum');
+
+      if (elNaqdSum) elNaqdSum.innerText = formatNumber(kpi.total_naqd_sum) + ' so\'m';
+      if (elNaqdCount) elNaqdCount.innerText = `${kpi.count_naqd || 0} ta`;
+      if (elNasiyaSum) elNasiyaSum.innerText = formatNumber(kpi.total_nasiya_sum) + ' so\'m';
+      if (elNasiyaCount) elNasiyaCount.innerText = `${kpi.count_nasiya || 0} ta`;
+      if (elPaidSum) elPaidSum.innerText = formatNumber(kpi.total_paid_sum) + ' so\'m';
+      if (elPaidCount) elPaidCount.innerText = `${kpi.count_paid || 0} ta`;
+      if (elDebtSum) elDebtSum.innerText = formatNumber(kpi.total_debtors_balance) + ' so\'m';
+
+      // 1. Grafik: Naqd vs Nasiya
+      if (data.chart) renderSalesChart(data.chart);
+
+      // 2. Top Qarzdorlar
+      if (data.top_debtors) renderDebtDoughnut(data.top_debtors);
+
+      // 3. Oxirgi operatsiyalar
+      if (data.recent_records) renderRecentTransactions(data.recent_records);
+    }
+
+    function loadCachedDashboard() {
+      try {
+        const raw = localStorage.getItem('mmm_dash_cache_' + currentPeriod);
+        if (raw) {
+          applyDashboardData(JSON.parse(raw));
+        }
+      } catch (e) {}
+    }
+
     async function loadDashboardStats() {
+      // 1. Dastlab 0 soniyada keshlangan ma'lumotni darhol ko'rsatish (qotmaslik uchun):
+      loadCachedDashboard();
+
       try {
         const res = await fetch(`/api/stats?period=${currentPeriod}`);
         const data = await res.json();
-        const kpi = data.kpi || {};
-
-        if (data.current_usd_rate) {
-          liveUsdRate = data.current_usd_rate;
-          document.getElementById('usd-rate-badge').innerHTML = `<span>💵 1$ = ${formatNumber(liveUsdRate)} so'm (MB kursi)</span>`;
-        }
-
-        // KPI
-        document.getElementById('kpi-naqd-sum').innerText = formatNumber(kpi.total_naqd_sum) + ' so\'m';
-        document.getElementById('kpi-naqd-count').innerText = `${kpi.count_naqd || 0} ta`;
-
-        document.getElementById('kpi-nasiya-sum').innerText = formatNumber(kpi.total_nasiya_sum) + ' so\'m';
-        document.getElementById('kpi-nasiya-count').innerText = `${kpi.count_nasiya || 0} ta`;
-
-        document.getElementById('kpi-paid-sum').innerText = formatNumber(kpi.total_paid_sum) + ' so\'m';
-        document.getElementById('kpi-paid-count').innerText = `${kpi.count_paid || 0} ta`;
-
-        document.getElementById('kpi-debt-sum').innerText = formatNumber(kpi.total_debtors_balance) + ' so\'m';
-
-        // 1. Grafik: Naqd vs Nasiya
-        renderSalesChart(data.chart);
-
-        // 2. Top Qarzdorlar
-        renderDebtDoughnut(data.top_debtors);
-
-        // 3. Oxirgi operatsiyalar
-        renderRecentTransactions(data.recent_records);
-
+        try {
+          localStorage.setItem('mmm_dash_cache_' + currentPeriod, JSON.stringify(data));
+        } catch (e) {}
+        applyDashboardData(data);
       } catch (err) {
         console.error('Statistika yuklashda xatolik:', err);
       }

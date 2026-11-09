@@ -87,7 +87,9 @@ def init_db():
             "CREATE INDEX IF NOT EXISTS idx_category ON records(category);",
             "CREATE INDEX IF NOT EXISTS idx_date ON records(date_str);",
             "CREATE INDEX IF NOT EXISTS idx_partner ON records(partner_name);",
-            "CREATE INDEX IF NOT EXISTS idx_cust_name ON customers(name);"
+            "CREATE INDEX IF NOT EXISTS idx_cust_name ON customers(name);",
+            "CREATE INDEX IF NOT EXISTS idx_chat_msg ON records(chat_id, message_id);",
+            "CREATE INDEX IF NOT EXISTS idx_date_cat ON records(date_str, category);"
         ]
         client.batch(statements)
         
