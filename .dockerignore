@@ -1,0 +1,14 @@
+.env
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.db
+cloudflared.exe
+exports/
+backups/
+telegram_warehouse_bot_backup_*
+.venv
+env/

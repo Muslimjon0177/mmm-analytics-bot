@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: telegram-warehouse-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    plan: free
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: WEB_APP_URL
+        sync: false

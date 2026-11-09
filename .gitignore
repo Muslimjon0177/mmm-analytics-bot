@@ -1,0 +1,22 @@
+# Environment variables & secrets
+.env
+*.env
+
+# SQLite local databases & backups
+*.db
+warehouse.db
+backups/
+exports/
+telegram_warehouse_bot_backup_*
+
+# Executables & binaries
+cloudflared.exe
+*.exe
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
