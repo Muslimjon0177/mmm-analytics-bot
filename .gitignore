@@ -2,9 +2,7 @@
 .env
 *.env
 
-# SQLite local databases & backups
-*.db
-warehouse.db
+# SQLite backups (database itself is tracked so deployments boot with preloaded data)
 backups/
 exports/
 telegram_warehouse_bot_backup_*

@@ -1,11 +1,25 @@
 import logging
-from datetime import datetime, timedelta
+import re
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 import libsql_client
 from config import TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, DB_PATH
 from currency import get_usd_rate
 
 logger = logging.getLogger(__name__)
+
+# Toshkent vaqt mintaqasi (UTC+5)
+TASHKENT_TZ = timezone(timedelta(hours=5))
+
+def get_now() -> datetime:
+    """Toshkent vaqti (UTC+5)"""
+    return datetime.now(TASHKENT_TZ)
+
+try:
+    from cloud_sync import download_db_from_cloud, trigger_cloud_sync_async
+except Exception:
+    def download_db_from_cloud(): pass
+    def trigger_cloud_sync_async(): pass
 
 def get_client() -> libsql_client.ClientSync:
     """Turso Cloud yoki lokal SQLite fayliga ulanish mijozini qaytaradi"""
@@ -44,8 +58,138 @@ def health_check() -> bool:
             try: client.close()
             except Exception: pass
 
+def normalize_partner_name(name: str) -> str:
+    """Mijoz ismini tozalash va standartlashtirish"""
+    if not name:
+        return ""
+    cleaned = name.strip()
+    for suffix in ["ga", "dan", "ning", "ni"]:
+        if cleaned.lower().endswith(suffix) and len(cleaned) > len(suffix) + 3:
+            cleaned = cleaned[:-len(suffix)].strip()
+    return cleaned
+
+def rebuild_all_customers(client=None):
+    """Barcha yozuvlardan mijozlar balansi va qarz daftarini to'liq qayta hisoblash"""
+    should_close = False
+    if client is None:
+        client = get_client()
+        should_close = True
+    try:
+        res = client.execute("""
+            SELECT partner_name, category, total_amount, currency, amount_usd 
+            FROM records 
+            WHERE partner_name IS NOT NULL AND TRIM(partner_name) != ''
+        """)
+        cust_map = {}
+        for row in res.rows:
+            p_name = row[0]
+            cat = row[1]
+            tot = float(row[2]) if row[2] else 0.0
+            
+            clean_display = normalize_partner_name(p_name)
+            if not clean_display:
+                continue
+            clean_key = clean_display.lower()
+            
+            if clean_key not in cust_map:
+                cust_map[clean_key] = {"display": clean_display, "total_credit": 0.0, "total_paid": 0.0}
+            
+            if cat == "nasiya":
+                cust_map[clean_key]["total_credit"] += tot
+            elif cat in ("pul_keldi", "to'lov", "tolov"):
+                cust_map[clean_key]["total_paid"] += tot
+
+        client.execute("DELETE FROM customers")
+        for key, c in cust_map.items():
+            balance = c["total_credit"] - c["total_paid"]
+            client.execute("""
+                INSERT INTO customers (name, display_name, total_credit, total_paid, current_balance, last_updated)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, [key, c["display"], c["total_credit"], c["total_paid"], balance])
+            
+        logger.info(f"Mijozlar bazasi (CRM) muvaffaqiyatli yangilandi: {len(cust_map)} ta mijoz.")
+    except Exception as e:
+        logger.error(f"rebuild_all_customers xatolik: {e}")
+    finally:
+        if should_close:
+            client.close()
+
+def _auto_migrate_legacy_data(client):
+    """Eski ma'lumotlarni (ketim/ostatka) naqd/nasiya/pul_keldiga va 3 nol qoidasiga avtomatik o'tkazish"""
+    try:
+        usd_rate = get_usd_rate()
+        res = client.execute("SELECT id, category, item_name, quantity, price, total_amount, partner_name, raw_message, currency, amount_usd FROM records")
+        records = res.rows
+        
+        need_update = False
+        for r in records:
+            rec_id, old_cat, item, qty, price, tot, partner, raw, curr, usd_amt = r
+            raw = (raw or "").strip()
+            lower_raw = raw.lower()
+            
+            new_cat = old_cat
+            if old_cat == "kelim" or "kelim" in lower_raw or "kirdi" in lower_raw or "fura" in lower_raw:
+                new_cat = "kelim"
+            elif old_cat in ("ostatka", "pul_keldi") or any(k in lower_raw for k in ["berdi", "to'ladi", "toladi", "yopdi", "pul keldi", "pul berdi", "oplata"]):
+                new_cat = "pul_keldi"
+            elif "nasiya" in lower_raw or partner:
+                new_cat = "nasiya"
+            elif "naxt" in lower_raw or "naqd" in lower_raw or not partner:
+                new_cat = "naqd"
+                
+            new_price = price
+            if new_price is not None and 0 < new_price < 1000:
+                new_price = new_price * 1000
+                
+            new_tot = tot or 0
+            if new_tot is not None and 0 < new_tot < 100000 and new_cat in ("naqd", "nasiya", "kelim"):
+                new_tot = new_tot * 1000
+                
+            if (not new_tot or new_tot == 0) and new_price and qty:
+                new_tot = new_price * qty
+                
+            new_curr = curr or "UZS"
+            new_usd_amt = usd_amt
+            if "$" in raw or "dollar" in lower_raw:
+                new_curr = "USD"
+                usd_match = re.search(r'(\d+[\d\s.,]*)\s*(\$|dollar)', lower_raw)
+                if usd_match:
+                    try:
+                        v_str = usd_match.group(1).replace(" ", "").replace(",", "")
+                        new_usd_amt = float(v_str)
+                        new_tot = round(new_usd_amt * usd_rate, 2)
+                    except Exception:
+                        pass
+                        
+            clean_display = normalize_partner_name(partner) if partner else None
+            if not clean_display and new_cat in ("nasiya", "pul_keldi"):
+                words = raw.split()
+                pot = [w for w in words if re.match(r'^[A-ZА-ЯЁ][a-zа-яё]+', w)]
+                if pot:
+                    clean_display = normalize_partner_name(" ".join(pot[:3]))
+                    
+            if (new_cat != old_cat or new_price != price or new_tot != tot or clean_display != partner or new_curr != curr or new_usd_amt != usd_amt):
+                client.execute("""
+                    UPDATE records 
+                    SET category = ?, partner_name = ?, price = ?, total_amount = ?, currency = ?, amount_usd = ?
+                    WHERE id = ?
+                """, [new_cat, clean_display, new_price, new_tot, new_curr, new_usd_amt, rec_id])
+                need_update = True
+                
+        if need_update:
+            logger.info("Eski yozuvlar avtomatik to'g'rilandi. Mijozlar qayta hisoblanmoqda...")
+            rebuild_all_customers(client)
+    except Exception as e:
+        logger.warning(f"Avtomatik ma'lumotlarni normalizatsiyalashda ogohlantirish: {e}")
+
 def init_db():
-    """Baza jadvallarini yaratish va yangilash"""
+    """Baza jadvallarini yaratish, bulut bilan sinxronlash va yangilash"""
+    # 1. Bulutdan oxirgi bazani yuklab olish
+    try:
+        download_db_from_cloud()
+    except Exception as e:
+        logger.warning(f"Cloud download ogohlantirish: {e}")
+
     client = get_client()
     try:
         statements = [
@@ -114,22 +258,26 @@ def init_db():
         except Exception as mig_err:
             logger.warning(f"Ustunlar migratsiyasida xatolik: {mig_err}")
 
-        logger.info("Ma'lumotlar bazasi jadvallari va indekslari muvaffaqiyatli tekshirildi.")
+        # Avtomatik tekshiruv: eski yozuvlar bormi yoki mijozlar bazasi bo'sh qolganmi?
+        try:
+            legacy_res = client.execute("SELECT COUNT(*) FROM records WHERE category IN ('ketim', 'ostatka') OR (price > 0 AND price < 1000)")
+            cust_res = client.execute("SELECT COUNT(*) FROM customers")
+            has_legacy = legacy_res.rows and legacy_res.rows[0][0] > 0
+            cust_empty = not cust_res.rows or cust_res.rows[0][0] == 0
+            
+            if has_legacy or cust_empty:
+                logger.info("Baza yozuvlarini va mijozlar balansini tekshirish/normalizatsiya qilish boshlandi...")
+                _auto_migrate_legacy_data(client)
+                rebuild_all_customers(client)
+        except Exception as check_err:
+            logger.warning(f"Baza tekshiruvida ogohlantirish: {check_err}")
+
+        logger.info("Ma'lumotlar bazasi jadvallari va mijozlar bazasi 100% tayyor holatda.")
     except Exception as e:
         logger.error(f"init_db xatoligi: {e}")
         raise
     finally:
         client.close()
-
-def normalize_partner_name(name: str) -> str:
-    """Mijoz ismini tozalash va standartlashtirish"""
-    if not name:
-        return ""
-    cleaned = name.strip()
-    for suffix in ["ga", "dan", "ning", "ni"]:
-        if cleaned.lower().endswith(suffix) and len(cleaned) > len(suffix) + 3:
-            cleaned = cleaned[:-len(suffix)].strip()
-    return cleaned
 
 def update_customer_ledger(partner_name: str, category: str, amount: float):
     """Mijozlar balansi va qarz daftarini yangilash"""
@@ -222,6 +370,12 @@ def delete_records_by_message(chat_id: int, message_id: int) -> List[str]:
                 affected_partners.add(row[0])
         
         client.execute("DELETE FROM records WHERE chat_id = ? AND message_id = ?", [chat_id, message_id])
+        
+        try:
+            trigger_cloud_sync_async()
+        except Exception:
+            pass
+
         return list(affected_partners)
     except Exception as e:
         logger.error(f"delete_records_by_message xatolik: {e}")
@@ -232,7 +386,7 @@ def delete_records_by_message(chat_id: int, message_id: int) -> List[str]:
 def recalculate_day_summary(target_date: Optional[str] = None) -> Dict[str, Any]:
     """1 kunlik barcha ma'lumotlarni ko'rib chiqish va statistikani to'liq yangilash"""
     if not target_date:
-        target_date = datetime.now().strftime("%Y-%m-%d")
+        target_date = get_now().strftime("%Y-%m-%d")
 
     client = get_client()
     try:
@@ -243,10 +397,17 @@ def recalculate_day_summary(target_date: Optional[str] = None) -> Dict[str, Any]
         for p in partners_res.rows:
             if p[0]:
                 recalculate_customer_balance(p[0])
+        
+        rebuild_all_customers(client)
     except Exception as e:
         logger.error(f"recalculate_day_summary xatolik: {e}")
     finally:
         client.close()
+
+    try:
+        trigger_cloud_sync_async()
+    except Exception:
+        pass
 
     return get_daily_summary(target_date)
 
@@ -269,7 +430,7 @@ def save_record(
     date_str: Optional[str] = None,
     time_str: Optional[str] = None,
 ) -> int:
-    now = datetime.now()
+    now = get_now()
     if not date_str:
         date_str = now.strftime("%Y-%m-%d")
     if not time_str:
@@ -282,7 +443,7 @@ def save_record(
     # 2. Jami summani hisoblash
     if total_amount is None and price is not None and quantity is not None:
         total_amount = float(price) * float(quantity)
-    elif total_amount is not None and 0 < total_amount < 1000 and category in ("naqd", "nasiya"):
+    elif total_amount is not None and 0 < total_amount < 100000 and category in ("naqd", "nasiya"):
         total_amount = total_amount * 1000
 
     # 3. Dollar kursi bo'yicha hisob-kitob
@@ -315,12 +476,17 @@ def save_record(
     if partner_name_cleaned and category in ("nasiya", "pul_keldi") and total_amount:
         update_customer_ledger(partner_name_cleaned, category, total_amount)
 
+    try:
+        trigger_cloud_sync_async()
+    except Exception:
+        pass
+
     return record_id
 
 def get_daily_summary(target_date: Optional[str] = None) -> Dict[str, Any]:
-    """Kunlik to'liq tahliliy hisobot"""
+    """Kunlik to'liq tahliliy hisobot va mijozlar holati"""
     if not target_date:
-        target_date = datetime.now().strftime("%Y-%m-%d")
+        target_date = get_now().strftime("%Y-%m-%d")
 
     client = get_client()
     try:
@@ -344,8 +510,41 @@ def get_daily_summary(target_date: Optional[str] = None) -> Dict[str, Any]:
             "SELECT COUNT(*), COALESCE(SUM(total_amount), 0) FROM records WHERE date_str = ? AND category = 'pul_keldi'",
             [target_date]
         ).rows[0]
-        # Jami qarzlar
+        
+        # Jami qarzlar va mijozlar statistikasi
         r_debt = client.execute("SELECT COALESCE(SUM(current_balance), 0) FROM customers WHERE current_balance > 0").rows[0]
+        r_cust_count = client.execute("SELECT COUNT(*) FROM customers").rows[0][0]
+        r_debtors_count = client.execute("SELECT COUNT(*) FROM customers WHERE current_balance > 0").rows[0][0]
+
+        # Top 3 qarzdor
+        top_res = client.execute("""
+            SELECT display_name, current_balance 
+            FROM customers 
+            WHERE current_balance > 0 
+            ORDER BY current_balance DESC 
+            LIMIT 3
+        """)
+        top_debtors = [{"name": row[0], "balance": row[1]} for row in top_res.rows]
+
+        # Oxirgi faol savdo kuni (agar bugun hali savdo bo'lmagan bo'lsa)
+        latest_summary = None
+        latest_date_res = client.execute("""
+            SELECT date_str FROM records 
+            WHERE date_str <= ? AND category IN ('naqd', 'nasiya', 'pul_keldi')
+            ORDER BY date_str DESC LIMIT 1
+        """, [target_date])
+        if latest_date_res.rows:
+            l_date = latest_date_res.rows[0][0]
+            if l_date != target_date:
+                l_naqd = client.execute("SELECT COUNT(*), COALESCE(SUM(total_amount), 0) FROM records WHERE date_str = ? AND category = 'naqd'", [l_date]).rows[0]
+                l_nasiya = client.execute("SELECT COUNT(*), COALESCE(SUM(total_amount), 0) FROM records WHERE date_str = ? AND category = 'nasiya'", [l_date]).rows[0]
+                l_pul = client.execute("SELECT COUNT(*), COALESCE(SUM(total_amount), 0) FROM records WHERE date_str = ? AND category = 'pul_keldi'", [l_date]).rows[0]
+                latest_summary = {
+                    "date": l_date,
+                    "naqd_count": l_naqd[0], "naqd_sum": l_naqd[1],
+                    "nasiya_count": l_nasiya[0], "nasiya_sum": l_nasiya[1],
+                    "pul_count": l_pul[0], "pul_sum": l_pul[1]
+                }
 
         return {
             "date": target_date,
@@ -353,14 +552,18 @@ def get_daily_summary(target_date: Optional[str] = None) -> Dict[str, Any]:
             "naqd": {"count": r_naqd[0], "total_sum": r_naqd[1], "qty": r_naqd[2]},
             "nasiya": {"count": r_nasiya[0], "total_sum": r_nasiya[1], "qty": r_nasiya[2]},
             "pul_keldi": {"count": r_pul[0], "total_sum": r_pul[1]},
-            "total_customer_debts": r_debt[0]
+            "total_customer_debts": r_debt[0],
+            "total_customers_count": r_cust_count,
+            "debtors_count": r_debtors_count,
+            "top_debtors": top_debtors,
+            "latest_active_summary": latest_summary
         }
     finally:
         client.close()
 
 def get_advanced_stats(period: str = "7days") -> Dict[str, Any]:
     """Mini App uchun tahliliy statistika va diagrammalar"""
-    now = datetime.now()
+    now = get_now()
     if period == "today":
         start_date = now.strftime("%Y-%m-%d")
         days_count = 1
