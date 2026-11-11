@@ -104,6 +104,18 @@ def get_main_menu() -> InlineKeyboardMarkup:
     )
     return markup
 
+def get_guest_menu() -> InlineKeyboardMarkup:
+    markup = InlineKeyboardMarkup(row_width=1)
+    if CURRENT_WEB_APP_URL:
+        markup.add(
+            InlineKeyboardButton("🚀 Mini Appni Ochish (Demo & Tahlil)", web_app=WebAppInfo(url=CURRENT_WEB_APP_URL))
+        )
+    markup.add(
+        InlineKeyboardButton("⚡ Botni Sotib Olish — 777 000 so'm/oy", url="https://t.me/fbr_a?text=men%20sotib%20olmoqchiman"),
+        InlineKeyboardButton("💬 Muallif bilan bog'lanish (@fbr_a)", url="https://t.me/fbr_a")
+    )
+    return markup
+
 def get_back_button() -> InlineKeyboardMarkup:
     markup = InlineKeyboardMarkup()
     if CURRENT_WEB_APP_URL:
@@ -426,61 +438,100 @@ def handle_edited_group_message(message):
     except Exception as e:
         logger.error(f"Tahrirlangan xabarni qayta ishlashda xatolik: {e}")
 
-# ----------------- ADMIN SHAXSIY BUYRUQLARI -----------------
+# ----------------- SHAXSIY BUYRUQLAR (ADMIN VA MEHMONLAR) -----------------
+
+def check_admin_or_reply(message) -> bool:
+    if is_admin(message.from_user.id):
+        return True
+    bot.send_message(
+        message.chat.id,
+        "🔒 <b>Ushbu hisobot faqat tizim egasi (admin) uchun ochiq.</b>\n\n"
+        "O'z biznesingiz yoki guruhingizga ham shunday aqlli bot va Mini App o'rnatmoqchi bo'lsangiz:\n"
+        "👑 Narxi: <b>777 000 so'm / oyiga</b>\n\n"
+        "Pastdagi tugmalar orqali Mini Appni sinab ko'rishingiz yoki darhol ulanishingiz mumkin:",
+        reply_markup=get_guest_menu()
+    )
+    return False
 
 @bot.message_handler(commands=['start', 'menu', 'app'], func=lambda m: m.chat.type == 'private')
 def cmd_start(message):
-    if not is_admin(message.from_user.id):
-        bot.reply_to(message, "Kechirasiz, siz ushbu botdan hisobotlarni ko'rish huquqiga ega emassiz.")
-        return
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name or "Foydalanuvchi"
 
-    welcome_text = (
-        f"Assalomu alaykum, <b>{message.from_user.first_name}</b>!\n\n"
-        f"🤖 <b>MMM Analytics & Warehouse Bot</b>ga xush kelibsiz.\n"
-        "Ushbu tizim sizning Telegram guruhingizdagi barcha savdolarni 24/7 avtomatlashtiradi:\n\n"
-        "• 🟢 <b>Naqd savdolar</b> avtomatik jamlanadi.\n"
-        "• 🔴 <b>Nasiya savdolar</b> qarz daftariga yoziladi.\n"
-        "• 💰 <b>Kassaga pul tushumlari</b> mijoz qarzidan ayirib boriladi.\n"
-        "• 👥 <b>Mijozlar bazasi (CRM)</b> barcha mijozlarning aniq balansini yuritadi.\n"
-        "• 📊 <b>Telegram Mini App</b> orqali real-vaqt interaktiv diagrammalar mavjud.\n\n"
-        "Quyidagi tugmalardan birini tanlang:"
-    )
-    bot.send_message(message.chat.id, welcome_text, reply_markup=get_main_menu())
+    # Har bir foydalanuvchi (admin yoki mehmon) uchun pastki chap MenuButton'ni faollashtirish
+    if CURRENT_WEB_APP_URL:
+        try:
+            bot.set_chat_menu_button(
+                chat_id=message.chat.id,
+                menu_button=MenuButtonWebApp(type="web_app", text="📊 Smart Panel", web_app=WebAppInfo(url=CURRENT_WEB_APP_URL))
+            )
+        except Exception:
+            pass
+
+    if is_admin(user_id):
+        welcome_text = (
+            f"Assalomu alaykum, <b>{first_name}</b> (Admin)!\n\n"
+            f"🤖 <b>MMM Analytics & Warehouse Bot</b> boshqaruv paneliga xush kelibsiz.\n"
+            "Ushbu tizim guruhingizdagi savdolarni 24/7 avtomatlashtirib boradi:\n\n"
+            "• 🟢 <b>Naqd savdolar</b> avtomatik jamlanadi.\n"
+            "• 🔴 <b>Nasiya savdolar</b> qarz daftariga yoziladi.\n"
+            "• 💰 <b>Kassaga pul tushumlari</b> mijoz qarzidan ayirib boriladi.\n"
+            "• 👥 <b>Mijozlar bazasi (CRM)</b> barcha mijozlarning balansini yuritadi.\n"
+            "• 📊 <b>Telegram Mini App</b> orqali real-vaqt interaktiv diagrammalar mavjud.\n\n"
+            "Quyidagi tugmalardan birini tanlang:"
+        )
+        bot.send_message(message.chat.id, welcome_text, reply_markup=get_main_menu())
+    else:
+        # Barcha boshqa foydalanuvchilar (mijozlar, xaridorlar, obunachilar) uchun ochiq vitrina:
+        guest_text = (
+            f"Assalomu alaykum, <b>{first_name}</b>! 🚀\n\n"
+            f"🤖 <b>MMM Analytics</b> — Telegram guruhlardagi savdo, ombor va nasiyalarni 24/7 avtomatlashtiruvchi aqlli AI tizim.\n\n"
+            "✨ <b>Asosiy Imkoniyatlar:</b>\n"
+            "• 🧠 <b>Gemini 2.0 AI</b> bilan xabarlarni avtomatik ajratish (Naqd, Nasiya, To'lov)\n"
+            "• 🔕 <b>100% jim guruh rejimi</b> (guruhdagilarni bezovta qilmaydi)\n"
+            "• 👥 <b>Avtomatik Nasiya Daftari (CRM)</b> va mijozlar qarz balansi\n"
+            "• 📊 <b>Neon Dark interaktiv Mini App</b> mobil boshqaruv paneli\n"
+            "• 📥 <b>1-tugma bilan Excel (.xlsx)</b> hisobot eksporti\n\n"
+            "👑 <b>O'z guruhingizga ham ulamoqchimisiz?</b>\n"
+            "Narxi: <b>oyiga 777 000 so'm</b> (bulutli server va sozlashlar ichida).\n\n"
+            "Quyidagi <b>«🚀 Mini Appni Ochish»</b> tugmasi orqali tizimni hoziroq sinab ko'ring:"
+        )
+        bot.send_message(message.chat.id, guest_text, reply_markup=get_guest_menu())
 
 @bot.message_handler(commands=['hisobot', 'bugun'], func=lambda m: m.chat.type == 'private')
 def cmd_hisobot(message):
-    if not is_admin(message.from_user.id): return
+    if not check_admin_or_reply(message): return
     bot.send_message(message.chat.id, generate_today_summary_text(), reply_markup=get_main_menu())
 
 @bot.message_handler(commands=['naqd'], func=lambda m: m.chat.type == 'private')
 def cmd_naqd(message):
-    if not is_admin(message.from_user.id): return
+    if not check_admin_or_reply(message): return
     bot.send_message(message.chat.id, generate_naqd_text(), reply_markup=get_back_button())
 
 @bot.message_handler(commands=['nasiya'], func=lambda m: m.chat.type == 'private')
 def cmd_nasiya(message):
-    if not is_admin(message.from_user.id): return
+    if not check_admin_or_reply(message): return
     bot.send_message(message.chat.id, generate_nasiya_text(), reply_markup=get_back_button())
 
 @bot.message_handler(commands=['pul', 'tolov'], func=lambda m: m.chat.type == 'private')
 def cmd_pul(message):
-    if not is_admin(message.from_user.id): return
+    if not check_admin_or_reply(message): return
     bot.send_message(message.chat.id, generate_pul_text(), reply_markup=get_back_button())
 
 @bot.message_handler(commands=['mijozlar', 'crm'], func=lambda m: m.chat.type == 'private')
 def cmd_customers(message):
-    if not is_admin(message.from_user.id): return
+    if not check_admin_or_reply(message): return
     bot.send_message(message.chat.id, generate_customers_text(), reply_markup=get_back_button())
 
 @bot.message_handler(commands=['excel'], func=lambda m: m.chat.type == 'private')
 def cmd_excel(message):
-    if not is_admin(message.from_user.id): return
+    if not check_admin_or_reply(message): return
     bot.send_message(message.chat.id, "Excel fayli tayyorlanmoqda, kuting...")
     send_excel_report(message.chat.id)
 
 @bot.message_handler(commands=['yangilash', 'refresh'], func=lambda m: m.chat.type == 'private')
 def cmd_refresh(message):
-    if not is_admin(message.from_user.id): return
+    if not check_admin_or_reply(message): return
     bot.send_message(message.chat.id, "🔄 1 kunlik barcha ma'lumotlar qayta hisoblanmoqda...")
     recalculate_day_summary()
     summary_text = (
@@ -495,6 +546,15 @@ def cmd_refresh(message):
 def handle_callbacks(call):
     chat_id = call.message.chat.id
     message_id = call.message.message_id
+    user_id = call.from_user.id
+
+    if not is_admin(user_id):
+        bot.answer_callback_query(
+            call.id,
+            "Ushbu funksiya faqat admin uchun. Botni o'z guruhingizga ulash: @fbr_a (oyiga 777.000 so'm)",
+            show_alert=True
+        )
+        return
 
     if call.data == "report_today":
         safe_edit_message_text(generate_today_summary_text(), chat_id, message_id, reply_markup=get_main_menu())
@@ -594,16 +654,26 @@ def main():
         except Exception as e:
             logger.warning(f"Lokal tunnelni ishga tushirishda ogohlantirish: {e}")
 
-    # Mini App URL adminga bildirish
-    if CURRENT_WEB_APP_URL and ADMIN_IDS:
-        for admin_id in ADMIN_IDS:
-            try:
-                bot.set_chat_menu_button(
-                    chat_id=admin_id,
-                    menu_button=MenuButtonWebApp(type="web_app", text="📊 Smart Panel", web_app=WebAppInfo(url=CURRENT_WEB_APP_URL))
-                )
-            except Exception as e:
-                logger.warning(f"Adminga MenuButton biriktirishda: {e}")
+    # Mini App URL barcha foydalanuvchilar (butun dunyo) uchun pastki chap MenuButton'da ko'rinadigan qilish:
+    if CURRENT_WEB_APP_URL:
+        try:
+            bot.set_chat_menu_button(
+                chat_id=None,
+                menu_button=MenuButtonWebApp(type="web_app", text="📊 Smart Panel", web_app=WebAppInfo(url=CURRENT_WEB_APP_URL))
+            )
+            logger.info("Global MenuButton (barcha foydalanuvchilar uchun) muvaffaqiyatli o'rnatildi.")
+        except Exception as e:
+            logger.warning(f"Global MenuButton o'rnatishda ogohlantirish: {e}")
+
+        if ADMIN_IDS:
+            for admin_id in ADMIN_IDS:
+                try:
+                    bot.set_chat_menu_button(
+                        chat_id=admin_id,
+                        menu_button=MenuButtonWebApp(type="web_app", text="📊 Smart Panel", web_app=WebAppInfo(url=CURRENT_WEB_APP_URL))
+                    )
+                except Exception as e:
+                    logger.warning(f"Adminga MenuButton biriktirishda: {e}")
 
     if BOT_MODE == "webhook":
         logger.info(f"Bot WEBHOOK rejimida ishlamoqda. Webhook URL: {CURRENT_WEB_APP_URL}/webhook/{WEBHOOK_SECRET}")
