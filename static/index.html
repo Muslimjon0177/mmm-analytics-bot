@@ -456,6 +456,7 @@
           MMM Analytics
           <span class="neon-pulse-dot"></span>
         </div>
+        <div id="user-role-badge" style="font-size:10px; font-weight:800; color:#00F2FE;">🚀 Vitrina & Taqdimot</div>
         <div id="usd-rate-badge" class="brand-rate">💵 1$ = 11 974 so'm</div>
       </div>
     </div>
@@ -473,6 +474,11 @@
   <!-- MAIN APP CONTAINER -->
   <div class="app-container">
 
+    <!-- DEMO SHIELD BANNER (FAKAT MEHMONLAR UCHUN KO'RINADI) -->
+    <div id="demo-banner" class="glass-card glow-cyan" style="display:none; padding:10px 14px; margin-bottom:12px; font-size:11px; color:#38BDF8; border-color:rgba(56,189,248,0.3);">
+      🛡️ <b>DEMO NAMUNA:</b> Haqiqiy savdo ma'lumotlari faqat biznes egasi uchun maxfiy saqlanadi. Quyida tizim namoyishi ko'rsatilmoqda.
+    </div>
+
     <!-- PRO BANNER (777.000 SO'M) -->
     <div onclick="switchTab('pricing')" class="glass-card glow-purple promo-banner">
       <div style="display:flex; align-items:center; gap:10px;">
@@ -489,7 +495,7 @@
     </div>
 
     <!-- ================= TAB 1: ASOSIY (DASHBOARD) ================= -->
-    <div id="tab-dashboard" class="tab-pane active">
+    <div id="tab-dashboard" class="tab-pane">
       
       <!-- DAVR FILTRI -->
       <div class="period-filter">
@@ -499,7 +505,7 @@
         <button onclick="changePeriod('all')" id="period-all" class="period-btn">Barchasi</button>
       </div>
 
-      <!-- 4 TA NEON KPI KARTALARI (0.01 soniyada darhol ko'rinadi) -->
+      <!-- 4 TA NEON KPI KARTALARI -->
       <div class="kpi-grid">
         
         <!-- 💵 NAQD -->
@@ -508,9 +514,9 @@
             <span class="kpi-label" style="color:#00F5A0;">
               <span style="width:6px; height:6px; border-radius:50%; background:#00F5A0;"></span> Naqd
             </span>
-            <span class="kpi-badge" id="kpi-naqd-count" style="background:rgba(0,245,160,0.15); color:#00F5A0; border:1px solid rgba(0,245,160,0.3);">29 ta</span>
+            <span class="kpi-badge" id="kpi-naqd-count" style="background:rgba(0,245,160,0.15); color:#00F5A0; border:1px solid rgba(0,245,160,0.3);">— ta</span>
           </div>
-          <div class="kpi-val" id="kpi-naqd-sum">39 742 432 so'm</div>
+          <div class="kpi-val" id="kpi-naqd-sum">— so'm</div>
           <div class="kpi-sub">To'liq to'langan</div>
         </div>
 
@@ -520,9 +526,9 @@
             <span class="kpi-label" style="color:#FF3366;">
               <span style="width:6px; height:6px; border-radius:50%; background:#FF3366;"></span> Nasiya
             </span>
-            <span class="kpi-badge" id="kpi-nasiya-count" style="background:rgba(255,51,102,0.15); color:#FF3366; border:1px solid rgba(255,51,102,0.3);">12 ta</span>
+            <span class="kpi-badge" id="kpi-nasiya-count" style="background:rgba(255,51,102,0.15); color:#FF3366; border:1px solid rgba(255,51,102,0.3);">— ta</span>
           </div>
-          <div class="kpi-val" id="kpi-nasiya-sum">182 944 000 so'm</div>
+          <div class="kpi-val" id="kpi-nasiya-sum">— so'm</div>
           <div class="kpi-sub">Qarzga berilgan</div>
         </div>
 
@@ -532,9 +538,9 @@
             <span class="kpi-label" style="color:#00F2FE;">
               <span style="width:6px; height:6px; border-radius:50%; background:#00F2FE;"></span> Pul Keldi
             </span>
-            <span class="kpi-badge" id="kpi-paid-count" style="background:rgba(0,242,254,0.15); color:#00F2FE; border:1px solid rgba(0,242,254,0.3);">16 ta</span>
+            <span class="kpi-badge" id="kpi-paid-count" style="background:rgba(0,242,254,0.15); color:#00F2FE; border:1px solid rgba(0,242,254,0.3);">— ta</span>
           </div>
-          <div class="kpi-val" id="kpi-paid-sum">235 037 054 so'm</div>
+          <div class="kpi-val" id="kpi-paid-sum">— so'm</div>
           <div class="kpi-sub">Qarzdan to'langan</div>
         </div>
 
@@ -546,7 +552,7 @@
             </span>
             <span class="kpi-badge" style="background:rgba(255,184,0,0.15); color:#FFB800; border:1px solid rgba(255,184,0,0.3);">CRM</span>
           </div>
-          <div class="kpi-val" id="kpi-debt-sum">169 894 000 so'm</div>
+          <div class="kpi-val" id="kpi-debt-sum">— so'm</div>
           <div class="kpi-sub">Hozirgi sof qoldiq</div>
         </div>
 
@@ -579,18 +585,7 @@
             <canvas id="debtDoughnutChart"></canvas>
           </div>
           <div id="top-debtors-list" style="flex:1;">
-            <div class="debtor-row">
-              <span style="color:#FFF; font-weight:700;">jo'rabek aka denov</span>
-              <span style="color:#FFB800; font-weight:900;">34 680 000</span>
-            </div>
-            <div class="debtor-row">
-              <span style="color:#FFF; font-weight:700;">G'ayrat aka Asaka</span>
-              <span style="color:#FFB800; font-weight:900;">34 170 000</span>
-            </div>
-            <div class="debtor-row">
-              <span style="color:#FFF; font-weight:700;">Adham aka Fargʻona</span>
-              <span style="color:#FFB800; font-weight:900;">22 610 000</span>
-            </div>
+            <div style="font-size:11px; color:#64748B; text-align:center; padding:10px;">Yuklanmoqda...</div>
           </div>
         </div>
       </div>
@@ -604,7 +599,7 @@
           </button>
         </div>
         <div id="recent-transactions-list" style="display:flex; flex-direction:column; gap:8px;">
-          <!-- JS dinamik yuklaydi -->
+          <div style="font-size:11px; color:#64748B; text-align:center; padding:10px;">Yuklanmoqda...</div>
         </div>
       </div>
 
@@ -752,23 +747,39 @@
 
     <!-- ================= TAB 4: MIJOZLAR BAZASI (CRM) ================= -->
     <div id="tab-customers" class="tab-pane">
-      <input type="text" id="search-customers" oninput="debounceSearch('customers')" placeholder="Mijoz ismi yoki firmasini qidirish..." style="width:100%; background:#0B111E; border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:10px 14px; color:#FFF; font-size:12px; outline:none; margin-bottom:12px;">
-      <div id="customers-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <div id="guest-customers-locked" class="glass-card glow-purple" style="display:none; text-align:center; padding:24px 16px; margin-bottom:14px;">
+        <div style="font-size:36px; margin-bottom:8px;">🔒</div>
+        <div style="font-size:15px; font-weight:900; color:#FFF; margin-bottom:6px;">CRM Mijozlar Daftari Maxfiy</div>
+        <div style="font-size:12px; color:#94A3B8; margin-bottom:16px;">Do'kon egasining barcha qarzdorlari va to'lovlari xavfsiz himoyalangan. Siz ham o'z guruhingizdagi savdo va qarz daftarlarini 24/7 avtomatlashtirmoqchimisiz?</div>
+        <button onclick="buySubscription()" class="shimmer-btn">👑 O'z guruhingizga ulash — 777 000 so'm/oy</button>
+      </div>
+      <div id="admin-customers-content">
+        <input type="text" id="search-customers" oninput="debounceSearch('customers')" placeholder="Mijoz ismi yoki firmasini qidirish..." style="width:100%; background:#0B111E; border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:10px 14px; color:#FFF; font-size:12px; outline:none; margin-bottom:12px;">
+        <div id="customers-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+      </div>
     </div>
 
     <!-- ================= TAB 5: BARCHA SAVDOLAR ================= -->
     <div id="tab-records" class="tab-pane">
-      <input type="text" id="search-records" oninput="debounceSearch('records')" placeholder="Tovar yoki mijoz bo'yicha qidiruv..." style="width:100%; background:#0B111E; border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:10px 14px; color:#FFF; font-size:12px; outline:none; margin-bottom:12px;">
-      <div id="records-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+      <div id="guest-records-locked" class="glass-card glow-cyan" style="display:none; text-align:center; padding:24px 16px; margin-bottom:14px;">
+        <div style="font-size:36px; margin-bottom:8px;">🔒</div>
+        <div style="font-size:15px; font-weight:900; color:#FFF; margin-bottom:6px;">Savdo Yozuvlari Maxfiy</div>
+        <div style="font-size:12px; color:#94A3B8; margin-bottom:16px;">Barcha naqd, nasiya va to'lov operatsiyalari faqat do'kon egasiga ko'rinadi.</div>
+        <button onclick="buySubscription()" class="shimmer-btn">🚀 Litsenziya olish — 777 000 so'm/oy</button>
+      </div>
+      <div id="admin-records-content">
+        <input type="text" id="search-records" oninput="debounceSearch('records')" placeholder="Tovar yoki mijoz bo'yicha qidiruv..." style="width:100%; background:#0B111E; border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:10px 14px; color:#FFF; font-size:12px; outline:none; margin-bottom:12px;">
+        <div id="records-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+      </div>
     </div>
 
   </div>
 
   <!-- BOTTOM NAVIGATION BAR -->
   <nav class="bottom-nav">
-    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item active">
+    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-      <span>Asosiy</span>
+      <span id="label-nav-dashboard">Asosiy</span>
     </button>
     <button onclick="switchTab('features')" id="nav-features" class="nav-item">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -791,9 +802,15 @@
   <!-- JAVASCRIPT: INSTANT RENDER & ULTRA FAST LOGIC -->
   <script>
     const tg = window.Telegram?.WebApp;
+    const tgUser = tg?.initDataUnsafe?.user;
+    const urlParams = new URLSearchParams(window.location.search);
+    const uidParam = urlParams.get('uid');
+    const currentUserId = uidParam || (tgUser ? tgUser.id : null);
+    const isAdmin = (currentUserId == 6656667725 || currentUserId == '6656667725');
 
     let currentPeriod = '7days';
-    let currentTab = 'dashboard';
+    // Admin uchun 'dashboard', mehmonlar uchun esa 'features' (Vitrina & Funksiyalar) ochiladi:
+    let currentTab = isAdmin ? 'dashboard' : 'features';
     let salesChartInstance = null;
     let debtChartInstance = null;
 
@@ -873,14 +890,9 @@
 
     async function loadDashboardStats() {
       try {
-        const raw = localStorage.getItem('mmm_cache_' + currentPeriod);
-        if (raw) applyDashboardData(JSON.parse(raw));
-      } catch (e) {}
-
-      try {
-        const res = await fetch(`/api/stats?period=${currentPeriod}`);
+        const adminQ = isAdmin ? `&uid=${currentUserId}` : '';
+        const res = await fetch(`/api/stats?period=${currentPeriod}${adminQ}`);
         const data = await res.json();
-        try { localStorage.setItem('mmm_cache_' + currentPeriod, JSON.stringify(data)); } catch (e) {}
         applyDashboardData(data);
       } catch (err) {
         console.error('Stat xato:', err);
@@ -987,14 +999,15 @@
         else if (r.category === 'nasiya') { badgeColor = '#FF3366'; badgeBg = 'rgba(255, 51, 102, 0.15)'; badgeText = 'Nasiya'; }
 
         const title = r.partner_name ? `${r.partner_name}: ${r.item_name || 'Savdo'}` : (r.item_name || 'Tovar');
+        const timeBadge = r.time_str ? ` • ${r.time_str}` : '';
 
         container.innerHTML += `
-          <div style="display:flex; align-items:center; justify-content:space-between; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.03);">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.03);">
             <div style="display:flex; align-items:center; gap:8px;">
               <span style="font-size:9px; font-weight:900; color:${badgeColor}; background:${badgeBg}; padding:2px 6px; border-radius:12px;">${badgeText}</span>
               <div>
                 <div style="font-size:11px; font-weight:700; color:#FFF;">${title}</div>
-                <div style="font-size:9px; color:#64748B;">${r.date_str}</div>
+                <div style="font-size:9px; color:#64748B;">${r.date_str}${timeBadge}</div>
               </div>
             </div>
             <div style="font-size:11px; font-weight:900; color:#FFF;">${formatNumber(r.total_amount)} so'm</div>
@@ -1004,13 +1017,20 @@
     }
 
     async function loadCustomers() {
+      if (!isAdmin) {
+        document.getElementById('guest-customers-locked').style.display = 'block';
+        document.getElementById('admin-customers-content').style.display = 'none';
+        return;
+      }
+
       const search = document.getElementById('search-customers')?.value || '';
       const container = document.getElementById('customers-list');
       if (!container) return;
       container.innerHTML = '<div style="text-align:center; color:#00F2FE; font-size:11px; padding:20px;">Yuklanmoqda...</div>';
 
       try {
-        const res = await fetch(`/api/customers?search=${encodeURIComponent(search)}`);
+        const adminQ = `&uid=${currentUserId}`;
+        const res = await fetch(`/api/customers?search=${encodeURIComponent(search)}${adminQ}`);
         const data = await res.json();
         const customers = data.customers || [];
 
@@ -1042,13 +1062,20 @@
     }
 
     async function loadRecords() {
+      if (!isAdmin) {
+        document.getElementById('guest-records-locked').style.display = 'block';
+        document.getElementById('admin-records-content').style.display = 'none';
+        return;
+      }
+
       const search = document.getElementById('search-records')?.value || '';
       const container = document.getElementById('records-list');
       if (!container) return;
       container.innerHTML = '<div style="text-align:center; color:#00F2FE; font-size:11px; padding:20px;">Yuklanmoqda...</div>';
 
       try {
-        const res = await fetch(`/api/records?search=${encodeURIComponent(search)}`);
+        const adminQ = `&uid=${currentUserId}`;
+        const res = await fetch(`/api/records?search=${encodeURIComponent(search)}${adminQ}`);
         const data = await res.json();
         const records = data.records || [];
 
@@ -1059,11 +1086,12 @@
         }
 
         records.slice(0, 40).forEach(r => {
+          const timeBadge = r.time_str ? ` • ${r.time_str}` : '';
           container.innerHTML += `
             <div class="glass-card" style="padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
               <div>
                 <div style="font-size:12px; font-weight:800; color:#FFF;">${r.item_name || 'Savdo'} ${r.partner_name ? '(' + r.partner_name + ')' : ''}</div>
-                <div style="font-size:9px; color:#64748B;">${r.date_str} • ${r.quantity || ''} ${r.unit || ''}</div>
+                <div style="font-size:9px; color:#64748B;">${r.date_str}${timeBadge} • ${r.quantity || ''} ${r.unit || ''}</div>
               </div>
               <div style="font-size:12px; font-weight:900; color:#00F5A0;">${formatNumber(r.total_amount)} so'm</div>
             </div>
@@ -1097,12 +1125,48 @@
 
     function exportExcel() {
       if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-      window.location.href = '/api/export-excel';
+      if (!isAdmin) {
+        alert("🔒 Excel hisobot yuklab olish faqat biznes egasi (admin) uchun ochiq.\n\nO'z guruhingizga ushbu botni ulash narxi: oyiga 777 000 so'm.");
+        switchTab('pricing');
+        return;
+      }
+      window.location.href = `/api/export-excel?uid=${currentUserId}`;
     }
 
-    // Sahifa yuklanishi bilan chaqirish
-    window.addEventListener('load', () => {
+    function initApp() {
+      const roleBadge = document.getElementById('user-role-badge');
+      const labelDash = document.getElementById('label-nav-dashboard');
+      const demoBanner = document.getElementById('demo-banner');
+      const guestCustLocked = document.getElementById('guest-customers-locked');
+      const adminCustContent = document.getElementById('admin-customers-content');
+      const guestRecLocked = document.getElementById('guest-records-locked');
+      const adminRecContent = document.getElementById('admin-records-content');
+
+      if (isAdmin) {
+        if (roleBadge) roleBadge.innerText = '👑 Boshqaruvchi: Muslimjon';
+        if (labelDash) labelDash.innerText = 'Dashboard';
+        if (demoBanner) demoBanner.style.display = 'none';
+        if (guestCustLocked) guestCustLocked.style.display = 'none';
+        if (adminCustContent) adminCustContent.style.display = 'block';
+        if (guestRecLocked) guestRecLocked.style.display = 'none';
+        if (adminRecContent) adminRecContent.style.display = 'block';
+        switchTab('dashboard');
+      } else {
+        if (roleBadge) roleBadge.innerText = '🚀 Vitrina & Taqdimot';
+        if (labelDash) labelDash.innerText = 'Demo Panel';
+        if (demoBanner) demoBanner.style.display = 'block';
+        if (guestCustLocked) guestCustLocked.style.display = 'block';
+        if (adminCustContent) adminCustContent.style.display = 'none';
+        if (guestRecLocked) guestRecLocked.style.display = 'block';
+        if (adminRecContent) adminRecContent.style.display = 'none';
+        switchTab('features');
+      }
       loadDashboardStats();
+    }
+
+    // Sahifa yuklanishi bilan ishga tushirish
+    window.addEventListener('load', () => {
+      initApp();
     });
   </script>
 </body>

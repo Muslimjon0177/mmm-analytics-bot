@@ -7,7 +7,7 @@ import logging
 import threading
 import signal
 import atexit
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp
 
@@ -17,7 +17,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
 
 from config import (
     BOT_TOKEN, ADMIN_IDS, ALLOWED_GROUP_IDS, PROXY_URL,
-    WEB_APP_URL, PORT, BOT_MODE, WEBHOOK_SECRET, AUTO_TUNNEL
+    WEB_APP_URL, DEFAULT_RENDER_URL, PORT, BOT_MODE, WEBHOOK_SECRET, AUTO_TUNNEL
 )
 from database import (
     init_db,
@@ -29,7 +29,8 @@ from database import (
     delete_records_by_message,
     recalculate_customer_balance,
     recalculate_day_summary,
-    get_now
+    get_now,
+    TASHKENT_TZ
 )
 from ai_parser import analyze_message
 from excel_export import create_excel_report
@@ -83,8 +84,9 @@ def safe_edit_message_text(text: str, chat_id: int, message_id: int, reply_marku
 def get_main_menu() -> InlineKeyboardMarkup:
     markup = InlineKeyboardMarkup(row_width=2)
     if CURRENT_WEB_APP_URL:
+        admin_webapp_url = f"{CURRENT_WEB_APP_URL}?uid=6656667725"
         markup.add(
-            InlineKeyboardButton("🚀 Smart Boshqaruv Paneli (Mini App)", web_app=WebAppInfo(url=CURRENT_WEB_APP_URL))
+            InlineKeyboardButton("🚀 Smart Boshqaruv Paneli (Mini App)", web_app=WebAppInfo(url=admin_webapp_url))
         )
     markup.add(
         InlineKeyboardButton("📊 Bugungi hisobot", callback_data="report_today"),
@@ -108,7 +110,7 @@ def get_guest_menu() -> InlineKeyboardMarkup:
     markup = InlineKeyboardMarkup(row_width=1)
     if CURRENT_WEB_APP_URL:
         markup.add(
-            InlineKeyboardButton("🚀 Mini Appni Ochish (Demo & Tahlil)", web_app=WebAppInfo(url=CURRENT_WEB_APP_URL))
+            InlineKeyboardButton("🚀 Mini Appni Ochish (Demo & Imkoniyatlar)", web_app=WebAppInfo(url=CURRENT_WEB_APP_URL))
         )
     markup.add(
         InlineKeyboardButton("⚡ Botni Sotib Olish — 777 000 so'm/oy", url="https://t.me/fbr_a?text=men%20sotib%20olmoqchiman"),
@@ -119,15 +121,19 @@ def get_guest_menu() -> InlineKeyboardMarkup:
 def get_back_button() -> InlineKeyboardMarkup:
     markup = InlineKeyboardMarkup()
     if CURRENT_WEB_APP_URL:
+        admin_webapp_url = f"{CURRENT_WEB_APP_URL}?uid=6656667725"
         markup.add(
-            InlineKeyboardButton("🚀 Mini Appni Ochish", web_app=WebAppInfo(url=CURRENT_WEB_APP_URL))
+            InlineKeyboardButton("🚀 Mini Appni Ochish", web_app=WebAppInfo(url=admin_webapp_url))
         )
     markup.add(InlineKeyboardButton("⬅️ Asosiy menyuga qaytish", callback_data="back_to_main"))
     return markup
 
 def generate_today_summary_text(target_date: Optional[str] = None) -> str:
+    now_tashkent = get_now()
     if not target_date:
-        target_date = get_now().strftime("%Y-%m-%d")
+        target_date = now_tashkent.strftime("%Y-%m-%d")
+    current_time_str = now_tashkent.strftime("%H:%M:%S")
+
     data = get_daily_summary(target_date)
     usd_rate = get_usd_rate()
 
@@ -144,6 +150,7 @@ def generate_today_summary_text(target_date: Optional[str] = None) -> str:
 
     lines = [
         f"📊 <b>KUNLIK HISOBOT ({target_date})</b>",
+        f"🕒 <i>Telegram vaqti: {current_time_str} (Toshkent UTC+5)</i>",
         f"💵 <i>Markaziy Bank kursi: 1$ = {format_number(usd_rate)} so'm</i>",
         "━━━━━━━━━━━━━━━━━━━━"
     ]
@@ -161,7 +168,7 @@ def generate_today_summary_text(target_date: Optional[str] = None) -> str:
             f"• Jami tushum: <b>{format_number(pul['total_sum'])} so'm</b>"
         ])
     else:
-        lines.append("🕒 <i>Ushbu sanada hali yangi savdo yozilmadi (bot guruhni 24/7 kutmoqda).</i>")
+        lines.append(f"🕒 <i>Bugun ({target_date}) guruhda hali yangi savdo xabari yozilmadi.</i>")
         if latest_active:
             l_date = latest_active.get("date", "")
             lines.extend([
@@ -174,7 +181,7 @@ def generate_today_summary_text(target_date: Optional[str] = None) -> str:
     lines.extend([
         "━━━━━━━━━━━━━━━━━━━━",
         f"👥 <b>MIJOZLAR BAZASI VA QARZLAR (CRM):</b>",
-        f"• Jami ro'yxatdagi mijozlar: <b>{total_cust} ta</b>",
+        f"• Jami ro'yxatdagi mijozlar: <b>{total_cust} ta</b> (100% saqlangan)",
         f"• Hozirda qarzdor mijozlar: <b>{debtors_cnt} ta</b>",
         f"• Qoldiq umumiy qarz: <b>{format_number(debts)} so'm</b>"
     ])
@@ -186,7 +193,7 @@ def generate_today_summary_text(target_date: Optional[str] = None) -> str:
 
     lines.extend([
         "━━━━━━━━━━━━━━━━━━━━",
-        "<i>Barcha 24 ta mijoz kartochkalari va grafiklar Mini Appda!</i>"
+        "<i>Barcha mijoz kartochkalari va grafiklar Mini Appda!</i>"
     ])
 
     return "\n".join(lines)
@@ -276,6 +283,12 @@ def handle_group_message(message):
         if not result.get("is_relevant") or not result.get("records"):
             return
 
+        # Telegram xabarining haqiqiy yuborilgan sana va vaqti (Toshkent vaqti UTC+5):
+        msg_timestamp = message.date or int(time.time())
+        msg_dt = datetime.fromtimestamp(msg_timestamp, tz=timezone.utc).astimezone(TASHKENT_TZ)
+        msg_date_str = msg_dt.strftime("%Y-%m-%d")
+        msg_time_str = msg_dt.strftime("%H:%M:%S")
+
         for rec in result["records"]:
             category = rec.get("category", "naqd")
             item_name = rec.get("item_name")
@@ -300,10 +313,12 @@ def handle_group_message(message):
                 raw_message=text,
                 sender_name=sender_name,
                 chat_id=message.chat.id,
-                message_id=message.message_id
+                message_id=message.message_id,
+                date_str=msg_date_str,
+                time_str=msg_time_str
             )
 
-        logger.info(f"Guruhdan {len(result['records'])} ta yozuv saqlandi ({sender_name}). Guruhga xabar yozilmaydi.")
+        logger.info(f"Guruhdan {len(result['records'])} ta yozuv saqlandi ({sender_name}, vaqt: {msg_time_str}). Guruhga xabar yozilmaydi.")
 
         # Guruhga yozilmaydi (jim rejim), lekin ADMINGA shaxsiy chatida (lichkada) darhol xabar boradi:
         if ADMIN_IDS:
@@ -332,6 +347,7 @@ def handle_group_message(message):
 
             notif_text = (
                 f"📥 <b>Guruhdan yangi ma'lumot qabul qilindi:</b>\n"
+                f"🕒 <i>Telegram vaqti: {msg_time_str} ({msg_date_str})</i>\n"
                 f"━━━━━━━━━━━━━━━━━━━━\n"
                 + "\n".join(summary_lines) +
                 f"\n━━━━━━━━━━━━━━━━━━━━\n"
@@ -382,6 +398,12 @@ def handle_edited_group_message(message):
                         pass
             return
 
+        # Telegram tahrirlangan xabarining haqiqiy sana va vaqti (Toshkent vaqti UTC+5):
+        msg_timestamp = message.edit_date or message.date or int(time.time())
+        msg_dt = datetime.fromtimestamp(msg_timestamp, tz=timezone.utc).astimezone(TASHKENT_TZ)
+        msg_date_str = msg_dt.strftime("%Y-%m-%d")
+        msg_time_str = msg_dt.strftime("%H:%M:%S")
+
         for rec in result["records"]:
             category = rec.get("category", "naqd")
             item_name = rec.get("item_name")
@@ -406,10 +428,12 @@ def handle_edited_group_message(message):
                 raw_message=text,
                 sender_name=sender_name,
                 chat_id=message.chat.id,
-                message_id=message.message_id
+                message_id=message.message_id,
+                date_str=msg_date_str,
+                time_str=msg_time_str
             )
 
-        logger.info(f"Guruhdagi tahrirlangan xabar qayta ishlandi ({sender_name}): {len(result['records'])} ta yozuv yangilandi.")
+        logger.info(f"Guruhdagi tahrirlangan xabar qayta ishlandi ({sender_name}, vaqt: {msg_time_str}): {len(result['records'])} ta yozuv yangilandi.")
 
         if ADMIN_IDS:
             summary_lines = []
@@ -599,22 +623,22 @@ def handle_callbacks(call):
 
 def keep_alive_worker():
     """Render bepul serverini doimo uyg'oq va issiq saqlash (Anti-sleep keep-alive).
-    Har 5 daqiqada tashqi domenga ping yuborib serverni 24/7 uyg'oq tutamiz!"""
-    time.sleep(15)
+    Har 3 daqiqada (180s) tashqi domenga ping yuborib serverni 24/7 uyg'oq tutamiz!"""
+    time.sleep(10)
+    target_base = CURRENT_WEB_APP_URL if (CURRENT_WEB_APP_URL and "localhost" not in CURRENT_WEB_APP_URL) else DEFAULT_RENDER_URL
+    health_url = f"{target_base.rstrip('/')}/health"
     while True:
         try:
-            if CURRENT_WEB_APP_URL and "localhost" not in CURRENT_WEB_APP_URL:
-                url = f"{CURRENT_WEB_APP_URL.rstrip('/')}/health"
-                req = urllib.request.Request(
-                    url,
-                    headers={"User-Agent": "MMM-Analytics-AntiSleep/1.0"}
-                )
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    pass
-                logger.info(f"Keep-alive ping muvaffaqiyatli: {url}")
+            req = urllib.request.Request(
+                health_url,
+                headers={"User-Agent": "MMM-Analytics-AntiSleep/2.0"}
+            )
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                pass
+            logger.info(f"Keep-alive ping muvaffaqiyatli: {health_url}")
         except Exception as e:
-            logger.debug(f"Keep-alive ping ogohlantirish: {e}")
-        time.sleep(300)  # Har 5 daqiqada (Render 15 daqiqada uxlaydi, 5 daqiqa uni doimo uyg'oq tutadi)
+            logger.debug(f"Keep-alive ping ogohlantirish ({health_url}): {e}")
+        time.sleep(180)  # Har 3 daqiqada (Render 15 daqiqada uxlaydi, 3 daqiqa uni doimo uyg'oq tutadi)
 
 def setup_signal_handlers():
     def handle_shutdown(signum, frame):

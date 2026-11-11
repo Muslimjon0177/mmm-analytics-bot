@@ -31,7 +31,8 @@ PROXY_URL = os.getenv("PROXY_URL", "").strip()
 # Web Server & Mini App Port (Koyeb and cloud PaaS provide $PORT)
 PORT = int(os.getenv("PORT", os.getenv("WEB_APP_PORT", "8000")))
 WEB_APP_PORT = PORT
-WEB_APP_URL = os.getenv("WEB_APP_URL", "").strip()
+DEFAULT_RENDER_URL = "https://mmm-analytics-bot-vo52.onrender.com"
+WEB_APP_URL = os.getenv("WEB_APP_URL", "").strip() or DEFAULT_RENDER_URL
 
 # Database Configuration (Turso Cloud vs Local SQLite Fallback)
 TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "").strip()

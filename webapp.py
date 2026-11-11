@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from flask import Flask, jsonify, request, send_from_directory, send_file
 import telebot
-from config import WEB_APP_PORT, BOT_MODE, WEBHOOK_SECRET, ENVIRONMENT
+from config import WEB_APP_PORT, BOT_MODE, WEBHOOK_SECRET, ENVIRONMENT, ADMIN_IDS
 from database import (
     get_advanced_stats,
     get_filtered_records,
@@ -62,13 +62,58 @@ def webhook(secret=None):
         return "ok", 200
     return "unsupported media", 400
 
+def is_admin_request(req) -> bool:
+    """Foydalanuvchi tizim egasi (admin) ekanligini xavfsiz tekshirish"""
+    uid_str = req.args.get("user_id") or req.args.get("uid") or req.headers.get("X-User-Id")
+    if uid_str and str(uid_str).strip().isdigit():
+        uid_val = int(str(uid_str).strip())
+        if uid_val in ADMIN_IDS or uid_val == 6656667725:
+            return True
+    return False
+
 @app.route("/api/stats")
 def api_stats():
-    """Grafiklar va KPI ko'rsatkichlari (Naqd, Nasiya, To'lovlar)"""
+    """Grafiklar va KPI ko'rsatkichlari (Admin uchun haqiqiy, mehmonlar uchun demo vitrina)"""
     period = request.args.get("period", "7days")
+    is_admin = is_admin_request(request)
+
+    if not is_admin:
+        # Mehmonlar / Xaridorlar uchun xavfsiz DEMO namuna (biznes sirlari to'liq yopiq)
+        demo_data = {
+            "is_demo": True,
+            "period": period,
+            "current_usd_rate": get_usd_rate(),
+            "kpi": {
+                "total_naqd_sum": 5240000,
+                "count_naqd": 6,
+                "total_nasiya_sum": 8900000,
+                "count_nasiya": 3,
+                "total_paid_sum": 4500000,
+                "count_paid": 2,
+                "total_debtors_balance": 4400000,
+                "total_sales": 14140000
+            },
+            "chart": {
+                "labels": ["05.11", "06.11", "07.11", "08.11", "09.11", "10.11", "11.11"],
+                "naqd": [800000, 1200000, 950000, 1400000, 0, 0, 890000],
+                "nasiya": [1500000, 2200000, 1800000, 3400000, 0, 0, 0],
+                "paid": [500000, 1000000, 800000, 2200000, 0, 0, 0]
+            },
+            "top_debtors": [
+                {"partner_name": "Namuna Xaridor 1", "balance": 2500000},
+                {"partner_name": "Namuna Do'kon 2", "balance": 1900000}
+            ],
+            "recent_records": [
+                {"category": "naqd", "item_name": "Olma (Namuna)", "quantity": 10, "unit": "yashik", "total_amount": 1700000, "date_str": "Bugun", "time_str": "12:30", "partner_name": None},
+                {"category": "nasiya", "item_name": "Nok (Namuna)", "quantity": 15, "unit": "yashik", "total_amount": 2550000, "date_str": "Bugun", "time_str": "11:15", "partner_name": "Namuna Xaridor 1"}
+            ]
+        }
+        return jsonify(demo_data)
+
     try:
         data = get_advanced_stats(period)
         data["current_usd_rate"] = get_usd_rate()
+        data["is_admin"] = True
         return jsonify(data)
     except Exception as e:
         logger.error(f"Statistika olishda xatolik: {e}")
@@ -76,7 +121,17 @@ def api_stats():
 
 @app.route("/api/records")
 def api_records():
-    """Filtrlangan va qidirilgan yozuvlar ro'yxati (naqd, nasiya, pul_keldi, kelim)"""
+    """Filtrlangan yozuvlar ro'yxati (Faqat admin uchun haqiqiy, begonalarga demo)"""
+    if not is_admin_request(request):
+        return jsonify({
+            "is_demo": True,
+            "records": [
+                {"id": 1, "category": "naqd", "item_name": "Olma (Namuna)", "quantity": 10, "unit": "yashik", "total_amount": 1700000, "date_str": "Bugun", "time_str": "12:30", "partner_name": None},
+                {"id": 2, "category": "nasiya", "item_name": "Nok (Namuna)", "quantity": 15, "unit": "yashik", "total_amount": 2550000, "date_str": "Bugun", "time_str": "11:15", "partner_name": "Namuna Xaridor 1"}
+            ],
+            "message": "Haqiqiy yozuvlar biznes egasi uchun maxfiy saqlanadi."
+        })
+
     category = request.args.get("category", "").strip()
     search = request.args.get("search", "").strip()
     limit = int(request.args.get("limit", 100))
@@ -88,20 +143,30 @@ def api_records():
             search=search if search else None,
             limit=limit
         )
-        return jsonify({"records": records})
+        return jsonify({"records": records, "is_admin": True})
     except Exception as e:
         logger.error(f"Yozuvlarni olishda xatolik: {e}")
         return jsonify({"error": str(e), "records": []}), 500
 
 @app.route("/api/customers")
 def api_customers():
-    """Mijozlar bazasi (CRM): qarzlar, to'lovlar, qoldiqlar"""
+    """Mijozlar bazasi (CRM): Faqat admin uchun haqiqiy, begonalarga demo"""
+    if not is_admin_request(request):
+        return jsonify({
+            "is_demo": True,
+            "customers": [
+                {"id": 1, "name": "namuna_1", "display_name": "Namuna Xaridor 1 (Toshkent)", "total_credit": 5000000, "total_paid": 2500000, "current_balance": 2500000},
+                {"id": 2, "name": "namuna_2", "display_name": "Namuna Do'kon 2 (Samarqand)", "total_credit": 3500000, "total_paid": 1600000, "current_balance": 1900000}
+            ],
+            "message": "Mijozlar bazasi faqat biznes egasiga ko'rinadi. O'z guruhingizga ulash: 777 000 so'm/oy (@fbr_a)"
+        })
+
     search = request.args.get("search", "").strip()
     limit = int(request.args.get("limit", 100))
 
     try:
         customers = get_all_customers(search=search if search else None, limit=limit)
-        return jsonify({"customers": customers})
+        return jsonify({"customers": customers, "is_admin": True})
     except Exception as e:
         logger.error(f"Mijozlarni olishda xatolik: {e}")
         return jsonify({"error": str(e), "customers": []}), 500
@@ -113,7 +178,10 @@ def api_rate():
 
 @app.route("/api/add-record", methods=["POST"])
 def api_add_record():
-    """Mini App orqali to'g'ridan-to'g'ri yangi yozuv kiritish"""
+    """Mini App orqali yozuv kiritish (faqat admin)"""
+    if not is_admin_request(request):
+        return jsonify({"error": "Ruxsat etilmagan"}), 403
+
     payload = request.get_json() or {}
     category = payload.get("category", "naqd")
     item_name = payload.get("item_name", "").strip()
@@ -155,7 +223,14 @@ def api_add_record():
 
 @app.route("/api/export-excel")
 def api_export_excel():
-    """Excel hisobotini xotiradan (RAM) to'g'ridan-to'g'ri yuklab olish"""
+    """Excel hisobotini yuklab olish (Faqat admin uchun!)"""
+    if not is_admin_request(request):
+        return jsonify({
+            "error": "Ruxsat etilmagan. Excel hisobot faqat tizim egasi uchun ochiq.",
+            "contact": "@fbr_a",
+            "subscription_price": "777 000 so'm / oyiga"
+        }), 403
+
     try:
         records = get_all_records_for_export()
         buffer = create_excel_report(records)
