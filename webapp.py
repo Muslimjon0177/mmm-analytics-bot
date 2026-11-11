@@ -180,11 +180,11 @@ def add_cache_headers(response):
     return response
 
 def run_server(port=WEB_APP_PORT):
-    """Flask WSGI serverini ishga tushirish"""
+    """Flask WSGI serverini ishga tushirish (multi-threaded, tezkor va qotmaydigan)"""
     import werkzeug.serving
     app.logger.setLevel(logging.WARNING)
     logging.getLogger('werkzeug').setLevel(logging.WARNING)
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)
 
 if __name__ == "__main__":
     run_server()

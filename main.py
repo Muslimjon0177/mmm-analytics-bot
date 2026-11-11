@@ -599,29 +599,22 @@ def handle_callbacks(call):
 
 def keep_alive_worker():
     """Render bepul serverini doimo uyg'oq va issiq saqlash (Anti-sleep keep-alive).
-    Render 15 daqiqa harakatsizlikdan so'ng uxlaydi. Har 7 daqiqada ping yuborib serverni 24/7 uyg'oq tutamiz!"""
-    time.sleep(25)
+    Har 5 daqiqada tashqi domenga ping yuborib serverni 24/7 uyg'oq tutamiz!"""
+    time.sleep(15)
     while True:
         try:
-            urls_to_ping = []
             if CURRENT_WEB_APP_URL and "localhost" not in CURRENT_WEB_APP_URL:
-                urls_to_ping.append(f"{CURRENT_WEB_APP_URL.rstrip('/')}/health")
-            urls_to_ping.append(f"http://127.0.0.1:{PORT}/health")
-
-            for u in urls_to_ping:
-                try:
-                    req = urllib.request.Request(
-                        u,
-                        headers={"User-Agent": "MMM-Analytics-AntiSleep/1.0"}
-                    )
-                    with urllib.request.urlopen(req, timeout=12) as resp:
-                        pass
-                except Exception:
+                url = f"{CURRENT_WEB_APP_URL.rstrip('/')}/health"
+                req = urllib.request.Request(
+                    url,
+                    headers={"User-Agent": "MMM-Analytics-AntiSleep/1.0"}
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
                     pass
-            logger.info("Keep-alive ping yuborildi: server 24/7 faol va tezyurar holatda saqlanmoqda.")
+                logger.info(f"Keep-alive ping muvaffaqiyatli: {url}")
         except Exception as e:
-            logger.debug(f"Keep-alive ping xatoligi: {e}")
-        time.sleep(420)  # Har 7 daqiqa
+            logger.debug(f"Keep-alive ping ogohlantirish: {e}")
+        time.sleep(300)  # Har 5 daqiqada (Render 15 daqiqada uxlaydi, 5 daqiqa uni doimo uyg'oq tutadi)
 
 def setup_signal_handlers():
     def handle_shutdown(signum, frame):
