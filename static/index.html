@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Ombor va Savdo CRM</title>
+  <title>MMM Analytics — Savdo & Ombor CRM</title>
   
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -11,16 +11,21 @@
     if (window.Telegram && window.Telegram.WebApp) {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
+      try {
+        window.Telegram.WebApp.headerColor = '#06090F';
+        window.Telegram.WebApp.backgroundColor = '#06090F';
+      } catch (e) {}
     }
   </script>
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Google Fonts -->
+  <!-- Google Fonts: Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <script>
     tailwind.config = {
@@ -29,7 +34,22 @@
         extend: {
           fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
           colors: {
-            dark: { 900: '#0B0F17', 850: '#111827', 800: '#161F30', 750: '#1C273C', 700: '#23324D' }
+            cyber: {
+              950: '#030508',
+              900: '#06090F',
+              850: '#0B111E',
+              800: '#101828',
+              750: '#162238',
+              700: '#1E2F4D'
+            },
+            neon: {
+              cyan: '#00F2FE',
+              emerald: '#00F5A0',
+              purple: '#A855F7',
+              rose: '#FF3366',
+              amber: '#FFB800',
+              blue: '#38BDF8'
+            }
           }
         }
       }
@@ -37,155 +57,290 @@
   </script>
 
   <style>
-    * { -webkit-tap-highlight-color: transparent; user-select: none; }
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      box-sizing: border-box;
+    }
+
     body {
-      background-color: var(--tg-theme-bg-color, #0B0F17);
-      color: var(--tg-theme-text-color, #F3F4F6);
+      background-color: #06090F;
+      color: #F8FAFC;
       font-family: 'Plus Jakarta Sans', sans-serif;
       overflow-x: hidden;
-      padding-bottom: 90px;
+      padding-bottom: 96px;
+      min-height: 100vh;
+      position: relative;
     }
+
+    /* Ambient Glowing Neon Orbs in Background */
+    .neon-ambient-glow {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .neon-ambient-glow::before {
+      content: '';
+      position: absolute;
+      top: -10%;
+      left: -10%;
+      width: 450px;
+      height: 450px;
+      background: radial-gradient(circle, rgba(0, 242, 254, 0.12) 0%, rgba(0, 0, 0, 0) 70%);
+      filter: blur(50px);
+      border-radius: 50%;
+    }
+    .neon-ambient-glow::after {
+      content: '';
+      position: absolute;
+      bottom: 10%;
+      right: -10%;
+      width: 450px;
+      height: 450px;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.14) 0%, rgba(0, 0, 0, 0) 70%);
+      filter: blur(50px);
+      border-radius: 50%;
+    }
+
+    /* Glassmorphism Classes */
     .glass-card {
-      background: rgba(22, 31, 48, 0.75);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      background: rgba(11, 17, 30, 0.72);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.08);
+      position: relative;
+      transition: all 0.25s ease;
     }
-    .glow-green { box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25); }
-    .glow-red { box-shadow: 0 0 25px -5px rgba(239, 68, 68, 0.25); }
-    .glow-blue { box-shadow: 0 0 25px -5px rgba(59, 130, 246, 0.25); }
-    .glow-amber { box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.25); }
+    .glass-card:hover {
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Neon Border Glows */
+    .neon-glow-cyan {
+      box-shadow: 0 0 25px -4px rgba(0, 242, 254, 0.35);
+      border-color: rgba(0, 242, 254, 0.35);
+    }
+    .neon-glow-emerald {
+      box-shadow: 0 0 25px -4px rgba(0, 245, 160, 0.35);
+      border-color: rgba(0, 245, 160, 0.35);
+    }
+    .neon-glow-purple {
+      box-shadow: 0 0 28px -4px rgba(168, 85, 247, 0.45);
+      border-color: rgba(168, 85, 247, 0.45);
+    }
+    .neon-glow-rose {
+      box-shadow: 0 0 25px -4px rgba(255, 51, 102, 0.35);
+      border-color: rgba(255, 51, 102, 0.35);
+    }
+    .neon-glow-amber {
+      box-shadow: 0 0 25px -4px rgba(255, 184, 0, 0.35);
+      border-color: rgba(255, 184, 0, 0.35);
+    }
+
+    /* Neon Pulsing Dot */
+    @keyframes neonPulse {
+      0%, 100% { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 8px #00F5A0); }
+      50% { transform: scale(1.2); opacity: 0.8; filter: drop-shadow(0 0 14px #00F5A0); }
+    }
+    .neon-pulse-dot {
+      animation: neonPulse 2s infinite ease-in-out;
+    }
+
+    /* Floating CTA Shimmer */
+    @keyframes neonShimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .neon-shimmer-btn {
+      background: linear-gradient(90deg, #A855F7, #00F2FE, #00F5A0, #A855F7);
+      background-size: 300% 100%;
+      animation: neonShimmer 5s infinite linear;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 4px; }
   </style>
 </head>
-<body class="min-h-screen text-slate-100 antialiased selection:bg-blue-600 selection:text-white">
+<body class="selection:bg-cyan-500 selection:text-black">
+
+  <!-- AMBIENT NEON BACKGROUND -->
+  <div class="neon-ambient-glow"></div>
 
   <!-- ================= TOP HEADER ================= -->
-  <header class="sticky top-0 z-30 px-4 py-3 bg-dark-900/90 backdrop-blur-md border-b border-white/5 flex items-center justify-between">
+  <header class="sticky top-0 z-30 px-4 py-3 bg-cyber-900/80 backdrop-blur-xl border-b border-white/10 flex items-center justify-between">
     <div class="flex items-center gap-2.5">
-      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-blue-600 flex items-center justify-center text-white font-black text-base shadow-lg shadow-emerald-500/20">
-        📊
+      <div class="relative w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 via-indigo-600 to-purple-600 p-[1.5px] shadow-lg shadow-cyan-500/20 flex-shrink-0">
+        <div class="w-full h-full bg-cyber-900 rounded-[14px] flex items-center justify-center text-lg">
+          🤖
+        </div>
       </div>
       <div>
-        <h1 class="text-sm font-bold leading-tight flex items-center gap-1.5">
-          Savdo & Ombor CRM
-          <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <h1 class="text-sm font-extrabold tracking-tight text-white flex items-center gap-1.5">
+          MMM Analytics
+          <span class="w-2 h-2 rounded-full bg-neon-emerald neon-pulse-dot"></span>
         </h1>
-        <div id="usd-rate-badge" class="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-          <span>💵 $1 = ... so'm</span>
+        <div id="usd-rate-badge" class="text-[10px] text-cyan-400 font-bold flex items-center gap-1 tracking-wide">
+          <span>💵 1$ = ... so'm</span>
         </div>
       </div>
     </div>
+    
     <div class="flex items-center gap-2">
-      <button onclick="exportExcel()" class="p-1.5 px-2.5 rounded-xl bg-dark-750 hover:bg-dark-700 text-emerald-400 border border-emerald-500/20 transition-all flex items-center gap-1 text-[11px] font-semibold">
+      <!-- Excel Eksport -->
+      <button onclick="exportExcel()" class="px-2.5 py-1.5 rounded-xl bg-cyber-850 hover:bg-cyber-800 text-neon-emerald border border-emerald-500/30 transition-all flex items-center gap-1.5 text-[11px] font-bold shadow-sm shadow-emerald-500/10 active:scale-95">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
         <span>Excel</span>
       </button>
-      <button onclick="refreshData()" class="p-2 rounded-xl bg-dark-750 hover:bg-dark-700 text-slate-300 border border-white/5 transition-all">
-        <svg id="refresh-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+
+      <!-- Yangilash -->
+      <button onclick="refreshData()" class="p-2 rounded-xl bg-cyber-850 hover:bg-cyber-800 text-slate-300 border border-white/10 transition-all active:scale-95">
+        <svg id="refresh-icon" class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
       </button>
     </div>
   </header>
 
-  <!-- ================= MAIN CONTAINER ================= -->
-  <main class="max-w-md mx-auto px-4 pt-3 space-y-3.5">
+  <!-- ================= MAIN CONTENT CONTAINER ================= -->
+  <main class="max-w-md mx-auto px-4 pt-3 space-y-3.5 relative z-10">
 
-    <!-- VAQT FILTRI -->
-    <div class="flex items-center justify-between bg-dark-850 p-1 rounded-2xl border border-white/5 text-xs font-semibold">
-      <button onclick="changePeriod('today')" id="period-today" class="period-btn flex-1 py-1.5 text-center rounded-xl transition-all text-slate-400">Bugun</button>
-      <button onclick="changePeriod('7days')" id="period-7days" class="period-btn flex-1 py-1.5 text-center rounded-xl transition-all bg-blue-600 text-white shadow">7 Kun</button>
-      <button onclick="changePeriod('month')" id="period-month" class="period-btn flex-1 py-1.5 text-center rounded-xl transition-all text-slate-400">Bu oy</button>
-      <button onclick="changePeriod('all')" id="period-all" class="period-btn flex-1 py-1.5 text-center rounded-xl transition-all text-slate-400">Barchasi</button>
+    <!-- ================= PROMO / PRICING STICKY TOP BANNER ================= -->
+    <div onclick="switchTab('pricing')" class="cursor-pointer glass-card neon-glow-purple p-3.5 rounded-2xl flex items-center justify-between border border-purple-500/40 relative overflow-hidden group">
+      <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-purple-600/20 rounded-full blur-xl pointer-events-none"></div>
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-cyan-500 flex items-center justify-center text-white text-base shadow-lg shadow-purple-500/30 flex-shrink-0">
+          👑
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-black text-white">PRO Litsenziya</span>
+            <span class="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40">24/7 AI</span>
+          </div>
+          <p class="text-[11px] text-slate-300">O'z guruhingizga ulash: <b class="text-neon-cyan">777 000 so'm/oy</b></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-1 text-[11px] font-extrabold text-neon-cyan group-hover:translate-x-1 transition-transform">
+        <span>Ulanish</span>
+        <span>→</span>
+      </div>
     </div>
 
-    <!-- ================= TAB 1: BOSH SAHIFA (DASHBOARD) ================= -->
+    <!-- ================= TAB 1: ASOSIY (DASHBOARD) ================= -->
     <div id="tab-dashboard" class="tab-content space-y-3.5">
       
-      <!-- 4 TA KPI KARTALARI (Naqd, Nasiya, Pul keldi, Qoldiq) -->
+      <!-- DAVR FILTRI (Vaqt tanlash) -->
+      <div class="flex items-center justify-between bg-cyber-850/80 backdrop-blur-md p-1 rounded-2xl border border-white/10 text-xs font-bold">
+        <button onclick="changePeriod('today')" id="period-today" class="period-btn flex-1 py-1.5 text-center rounded-xl transition-all text-slate-400">Bugun</button>
+        <button onclick="changePeriod('7days')" id="period-7days" class="period-btn flex-1 py-1.5 text-center rounded-xl transition-all bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/25">7 Kun</button>
+        <button onclick="changePeriod('month')" id="period-month" class="period-btn flex-1 py-1.5 text-center rounded-xl transition-all text-slate-400">Bu oy</button>
+        <button onclick="changePeriod('all')" id="period-all" class="period-btn flex-1 py-1.5 text-center rounded-xl transition-all text-slate-400">Barchasi</button>
+      </div>
+
+      <!-- 4 TA NEON KPI KARTALARI -->
       <div class="grid grid-cols-2 gap-2.5">
         
         <!-- 💵 NAQD SAVDO -->
-        <div class="glass-card glow-green p-3 rounded-2xl">
+        <div class="glass-card neon-glow-emerald p-3.5 rounded-2xl">
           <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-bold text-emerald-400 flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Naqd Savdo
+            <span class="text-xs font-black text-neon-emerald flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-neon-emerald"></span> Naqd Savdo
             </span>
-            <span class="text-[9px] text-slate-400 bg-white/5 px-1.5 py-0.5 rounded" id="kpi-naqd-count">0 ta</span>
+            <span class="text-[9px] text-emerald-300 font-bold bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full" id="kpi-naqd-count">0 ta</span>
           </div>
-          <div class="text-base font-extrabold text-white tracking-tight" id="kpi-naqd-sum">0 so'm</div>
-          <div class="text-[10px] text-slate-400 mt-1">To'liq to'langan</div>
+          <div class="text-[17px] font-black text-white tracking-tight mt-1" id="kpi-naqd-sum">0 so'm</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">To'liq to'langan naqd</div>
         </div>
 
         <!-- 📑 NASIYA SAVDO -->
-        <div class="glass-card glow-red p-3 rounded-2xl">
+        <div class="glass-card neon-glow-rose p-3.5 rounded-2xl">
           <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-bold text-red-400 flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Nasiya Savdo
+            <span class="text-xs font-black text-neon-rose flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-neon-rose"></span> Nasiya (Qarz)
             </span>
-            <span class="text-[9px] text-slate-400 bg-white/5 px-1.5 py-0.5 rounded" id="kpi-nasiya-count">0 ta</span>
+            <span class="text-[9px] text-rose-300 font-bold bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 rounded-full" id="kpi-nasiya-count">0 ta</span>
           </div>
-          <div class="text-base font-extrabold text-white tracking-tight" id="kpi-nasiya-sum">0 so'm</div>
-          <div class="text-[10px] text-slate-400 mt-1">Qarzga berilgan</div>
+          <div class="text-[17px] font-black text-white tracking-tight mt-1" id="kpi-nasiya-sum">0 so'm</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">Qarzga berilgan savdo</div>
         </div>
 
-        <!-- 💰 PUL KELDI (TO'LOVLAR) -->
-        <div class="glass-card glow-blue p-3 rounded-2xl">
+        <!-- 💰 KASSAGA PUL KELDI (TO'LOVLAR) -->
+        <div class="glass-card neon-glow-cyan p-3.5 rounded-2xl">
           <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-bold text-blue-400 flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Pul Keldi
+            <span class="text-xs font-black text-neon-cyan flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-neon-cyan"></span> Pul Keldi
             </span>
-            <span class="text-[9px] text-blue-300/80 bg-blue-500/10 px-1.5 py-0.5 rounded" id="kpi-paid-count">0 ta</span>
+            <span class="text-[9px] text-cyan-300 font-bold bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full" id="kpi-paid-count">0 ta</span>
           </div>
-          <div class="text-base font-extrabold text-white tracking-tight" id="kpi-paid-sum">0 so'm</div>
-          <div class="text-[10px] text-slate-400 mt-1">Qarzdan to'langan</div>
+          <div class="text-[17px] font-black text-white tracking-tight mt-1" id="kpi-paid-sum">0 so'm</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">Qarzdan yopilgan to'lov</div>
         </div>
 
-        <!-- 👥 MIJOZLAR QARZI -->
-        <div class="glass-card glow-amber p-3 rounded-2xl">
+        <!-- 👥 MIJOZLARNING JAMI QARZI -->
+        <div class="glass-card neon-glow-amber p-3.5 rounded-2xl">
           <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-bold text-amber-400 flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Mijozlar Qarzi
+            <span class="text-xs font-black text-neon-amber flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-neon-amber"></span> Jami Qarzlar
             </span>
-            <span class="text-[9px] text-amber-300/80 bg-amber-500/10 px-1.5 py-0.5 rounded">Balans</span>
+            <span class="text-[9px] text-amber-300 font-bold bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full">CRM</span>
           </div>
-          <div class="text-base font-extrabold text-white tracking-tight" id="kpi-debt-sum">0 so'm</div>
-          <div class="text-[10px] text-slate-400 mt-1">Hozirgi sof qoldiq</div>
+          <div class="text-[17px] font-black text-white tracking-tight mt-1" id="kpi-debt-sum">0 so'm</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">Hozirgi qoldiq balans</div>
         </div>
 
       </div>
 
-      <!-- GRAFIK 1: NAQD VS NASIYA DINAMIKASI -->
-      <div class="glass-card p-4 rounded-2xl space-y-2.5">
+      <!-- GRAFIK: NAQD VS NASIYA DINAMIKASI -->
+      <div class="glass-card p-4 rounded-3xl space-y-2.5 border border-white/10">
         <div class="flex items-center justify-between">
-          <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider">📈 Naqd vs Nasiya Savdo</h2>
-          <div class="flex items-center gap-2 text-[10px] font-semibold">
-            <span class="flex items-center gap-1 text-emerald-400"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Naqd</span>
-            <span class="flex items-center gap-1 text-red-400"><span class="w-2 h-2 rounded-full bg-red-500"></span> Nasiya</span>
+          <h2 class="text-xs font-extrabold text-white tracking-wider uppercase flex items-center gap-1.5">
+            <span>📈 Savdo Dinamikasi</span>
+          </h2>
+          <div class="flex items-center gap-2.5 text-[10px] font-bold">
+            <span class="flex items-center gap-1 text-neon-emerald">
+              <span class="w-2 h-2 rounded-full bg-neon-emerald shadow-[0_0_8px_#00F5A0]"></span> Naqd
+            </span>
+            <span class="flex items-center gap-1 text-neon-rose">
+              <span class="w-2 h-2 rounded-full bg-neon-rose shadow-[0_0_8px_#FF3366]"></span> Nasiya
+            </span>
           </div>
         </div>
-        <div class="relative h-44 w-full">
+        <div class="relative h-48 w-full mt-2">
           <canvas id="salesChart"></canvas>
         </div>
       </div>
 
-      <!-- GRAFIK 2: TOP QARZDOR MIJOZLAR -->
-      <div class="glass-card p-4 rounded-2xl space-y-3">
-        <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center justify-between">
-          <span>👥 Asosiy Qarzdorlar</span>
-          <button onclick="switchTab('customers')" class="text-[10px] text-blue-400 hover:underline font-semibold">Barcha mijozlar →</button>
-        </h2>
-        <div class="flex items-center gap-3">
+      <!-- TOP QARZDORLAR -->
+      <div class="glass-card p-4 rounded-3xl space-y-3 border border-white/10">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-extrabold text-white tracking-wider uppercase flex items-center gap-1.5">
+            <span>👥 Asosiy Qarzdorlar</span>
+          </h2>
+          <button onclick="switchTab('customers')" class="text-[11px] text-cyan-400 hover:text-cyan-300 font-extrabold transition-colors">
+            Barchasi (CRM) →
+          </button>
+        </div>
+        <div class="flex items-center gap-3 pt-1">
           <div class="relative w-28 h-28 flex-shrink-0">
             <canvas id="debtDoughnutChart"></canvas>
           </div>
-          <div id="top-debtors-list" class="flex-1 space-y-1.5 text-xs overflow-hidden">
+          <div id="top-debtors-list" class="flex-1 space-y-2 text-xs overflow-hidden">
             <!-- Dynamic Top Debtors -->
           </div>
         </div>
       </div>
 
-      <!-- OXIRGI OPERATSIYALAR -->
-      <div class="glass-card p-4 rounded-2xl space-y-2.5">
-        <h2 class="text-xs font-bold text-slate-200 uppercase tracking-wider">⚡ So'nggi Harakatlar</h2>
+      <!-- OXIRGI HARAKATLAR -->
+      <div class="glass-card p-4 rounded-3xl space-y-3 border border-white/10">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-extrabold text-white tracking-wider uppercase flex items-center gap-1.5">
+            <span>⚡ So'nggi Harakatlar</span>
+          </h2>
+          <button onclick="switchTab('records')" class="text-[11px] text-cyan-400 hover:text-cyan-300 font-extrabold transition-colors">
+            Barcha savdolar →
+          </button>
+        </div>
         <div id="recent-transactions-list" class="divide-y divide-white/5 space-y-2">
           <!-- Injected via JS -->
         </div>
@@ -193,79 +348,339 @@
 
     </div>
 
-    <!-- ================= TAB 2: NAQD SAVDO ================= -->
-    <div id="tab-naqd" class="tab-content hidden space-y-3">
-      <div class="relative">
-        <input type="text" id="search-naqd" oninput="debounceSearch('naqd')" placeholder="Naqd sotilgan mahsulotni qidirish..." class="w-full bg-dark-850 border border-white/10 rounded-2xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
-        <svg class="w-4 h-4 text-slate-500 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+    <!-- ================= TAB 2: BOT FUNKSIYALARI & AI XUSUSIYATLARI ================= -->
+    <div id="tab-features" class="tab-content hidden space-y-3.5">
+      
+      <!-- HERO CARD -->
+      <div class="glass-card neon-glow-cyan p-4 rounded-3xl border border-cyan-500/40 relative overflow-hidden">
+        <div class="flex items-center gap-3 mb-2">
+          <div class="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-xl text-cyan-400">
+            ⚡
+          </div>
+          <div>
+            <h2 class="text-sm font-black text-white">Bot Imkoniyatlari & AI Tizim</h2>
+            <p class="text-[11px] text-slate-300">Savdoni 100% avtomatlashtiruvchi zamonaviy texnologiyalar</p>
+          </div>
+        </div>
+        <p class="text-xs text-slate-300 leading-relaxed">
+          Ushbu tizim Telegram guruhlardagi betartib xabarlarni professional ombor va moliya bazasiga aylantiradi. Hech narsa unutilmaydi va qo'lda yozishga hojat qolmaydi!
+        </p>
       </div>
-      <div id="naqd-records-list" class="space-y-2"></div>
+
+      <!-- 8 TA ASOSIY XUSUSIYAT KARTALARI -->
+      <div class="space-y-2.5">
+
+        <!-- 1. Gemini AI -->
+        <div class="glass-card p-3.5 rounded-2xl border border-white/10 flex items-start gap-3">
+          <div class="w-8 h-8 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 flex items-center justify-center text-sm flex-shrink-0 mt-0.5">
+            🧠
+          </div>
+          <div>
+            <div class="text-xs font-extrabold text-white">Gemini 2.0 AI Guruh Tahlili</div>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-snug">
+              Har qanday formatdagi xabarni (lotin, kirill, imlo xatolar, <i>"2ta olmanok 170dan"</i>, <i>"Akmal aka 500 berdi"</i>) bir zumda tushunadi va toifalarga ajratadi.
+            </p>
+          </div>
+        </div>
+
+        <!-- 2. Jim Rejim -->
+        <div class="glass-card p-3.5 rounded-2xl border border-white/10 flex items-start gap-3">
+          <div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-sm flex-shrink-0 mt-0.5">
+            🔕
+          </div>
+          <div>
+            <div class="text-xs font-extrabold text-white">100% Jim Guruh Rejimi (Silent Mode)</div>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-snug">
+              Bot guruhga hech qanday ortiqcha xabar yozib ishchilarni chalg'itmaydi. Xabarni jimgina o'qiydi va shaxsiy chatingizga hisobot beradi.
+            </p>
+          </div>
+        </div>
+
+        <!-- 3. Tahrirlangan xabarlar -->
+        <div class="glass-card p-3.5 rounded-2xl border border-white/10 flex items-start gap-3">
+          <div class="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-sm flex-shrink-0 mt-0.5">
+            ✏️
+          </div>
+          <div>
+            <div class="text-xs font-extrabold text-white">Guruhda Xabar Tahrirlansa (Live Edit Sync)</div>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-snug">
+              Agar guruhda yozilgan savdo o'zgartirilsa yoki o'chirilsa, bot bazadagi eski yozuvni darhol bekor qiladi va yangilangan xabar bo'yicha qarzni to'g'irlaydi.
+            </p>
+          </div>
+        </div>
+
+        <!-- 4. Avtomatik CRM -->
+        <div class="glass-card p-3.5 rounded-2xl border border-white/10 flex items-start gap-3">
+          <div class="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center text-sm flex-shrink-0 mt-0.5">
+            👥
+          </div>
+          <div>
+            <div class="text-xs font-extrabold text-white">Avtomatik Mijozlar Bazasi & Nasiya Daftari</div>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-snug">
+              Har bir xaridorga alohida kartochka ochiladi: qancha qarz oldi, qancha to'ladi va hozirgi qoldiq qarzi soniya ichida hisoblab boriladi.
+            </p>
+          </div>
+        </div>
+
+        <!-- 5. Neon Mini App -->
+        <div class="glass-card p-3.5 rounded-2xl border border-white/10 flex items-start gap-3">
+          <div class="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 flex items-center justify-center text-sm flex-shrink-0 mt-0.5">
+            📊
+          </div>
+          <div>
+            <div class="text-xs font-extrabold text-white">Neon Dark Mini App (Mobil Boshqaruv)</div>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-snug">
+              Telegram ichida 0.1 soniyada ochiluvchi tezkor interfeys, grafiklar, filtrlash va to'liq statistika.
+            </p>
+          </div>
+        </div>
+
+        <!-- 6. Excel Eksport -->
+        <div class="glass-card p-3.5 rounded-2xl border border-white/10 flex items-start gap-3">
+          <div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-sm flex-shrink-0 mt-0.5">
+            📥
+          </div>
+          <div>
+            <div class="text-xs font-extrabold text-white">1-Tugma bilan Excel Eksport (.xlsx)</div>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-snug">
+              Barcha Naqd, Nasiya, To'lovlar va Ombor ma'lumotlarini bitta chiroyli Excel fayliga yuklab olish imkoniyati.
+            </p>
+          </div>
+        </div>
+
+        <!-- 7. Dollar kursi -->
+        <div class="glass-card p-3.5 rounded-2xl border border-white/10 flex items-start gap-3">
+          <div class="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center text-sm flex-shrink-0 mt-0.5">
+            💵
+          </div>
+          <div>
+            <div class="text-xs font-extrabold text-white">Markaziy Bank Kursi Integratsiyasi</div>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-snug">
+              Mijoz dollarda to'lagan bo'lsa (masalan 100$), bot Markaziy Bankning kunlik rasmiy kursi bo'yicha qarzidan avtomatik ayirib qo'yadi.
+            </p>
+          </div>
+        </div>
+
+        <!-- 8. Bulutli xavfsizlik -->
+        <div class="glass-card p-3.5 rounded-2xl border border-white/10 flex items-start gap-3">
+          <div class="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-sm flex-shrink-0 mt-0.5">
+            🛡️
+          </div>
+          <div>
+            <div class="text-xs font-extrabold text-white">24/7 Bulutli Zaxira (Hech narsa yo'qolmaydi)</div>
+            <p class="text-[11px] text-slate-400 mt-0.5 leading-snug">
+              Har bir operatsiya bulutga saqlanadi. Telefon o'chsa yoki buzilsa ham, biznesingiz ma'lumotlari xavfsiz va butun saqlanadi.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- CTA CARD -->
+      <div class="glass-card p-4 rounded-3xl border border-cyan-500/30 text-center space-y-2.5">
+        <h3 class="text-xs font-bold text-slate-300">Sizning biznesingizga ham shunday tizim kerakmi?</h3>
+        <button onclick="switchTab('pricing')" class="w-full neon-shimmer-btn text-black font-black text-xs py-3 rounded-2xl shadow-lg active:scale-98 transition-all">
+          Tarif va Narxlar bilan tanishish →
+        </button>
+      </div>
+
     </div>
 
-    <!-- ================= TAB 3: NASIYA SAVDO ================= -->
-    <div id="tab-nasiya" class="tab-content hidden space-y-3">
-      <div class="relative">
-        <input type="text" id="search-nasiya" oninput="debounceSearch('nasiya')" placeholder="Mijoz ismi yoki tovar bo'yicha qidiruv..." class="w-full bg-dark-850 border border-white/10 rounded-2xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500">
-        <svg class="w-4 h-4 text-slate-500 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+    <!-- ================= TAB 3: TARIF & SOTIB OLISH (777.000 SO'M) ================= -->
+    <div id="tab-pricing" class="tab-content hidden space-y-3.5">
+      
+      <!-- HERO HEADER -->
+      <div class="text-center space-y-1.5 pt-1">
+        <span class="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/30">
+          👑 RASMIY OBUNA TIZIMI
+        </span>
+        <h2 class="text-lg font-black text-white">Biznesingizni Avtomatlashtiring</h2>
+        <p class="text-xs text-slate-400">Telegram guruhingizdagi savdolarni boshqarish uchun to'liq yechim</p>
       </div>
-      <div id="nasiya-records-list" class="space-y-2"></div>
+
+      <!-- GLOWING PRICING CARD -->
+      <div class="glass-card neon-glow-purple p-5 rounded-3xl border border-purple-500/50 space-y-4 relative overflow-hidden">
+        
+        <div class="flex items-center justify-between pb-3 border-b border-white/10">
+          <div>
+            <span class="text-[10px] font-extrabold uppercase text-purple-400 tracking-wider">Litsenziya Rejasi</span>
+            <h3 class="text-base font-black text-white">PRO All-Inclusive</h3>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-neon-cyan/15 text-neon-cyan border border-cyan-400/30">
+            ⚡ 24/7 AVTO
+          </span>
+        </div>
+
+        <!-- NARX DISPLAY -->
+        <div class="space-y-1">
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-3xl font-black text-white tracking-tight">777 000</span>
+            <span class="text-xs font-bold text-slate-400">so'm / oyiga</span>
+          </div>
+          <p class="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+            <span>✓ Barcha xarajatlar va server to'lovi ichida</span>
+          </p>
+        </div>
+
+        <!-- IMKONIYATLAR RO'YXATI -->
+        <div class="space-y-2 pt-2 border-t border-white/10 text-xs text-slate-200">
+          <div class="flex items-center gap-2">
+            <span class="text-neon-emerald font-black">✓</span>
+            <span>Shaxsiy botingiz va Telegram guruhingizga 24/7 ulanish</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-neon-emerald font-black">✓</span>
+            <span>Cheksiz savdo, nasiya va to'lovlar avtomatik tahlili</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-neon-emerald font-black">✓</span>
+            <span>Avtomatik Mijozlar bazasi (CRM) va qarz daftari</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-neon-emerald font-black">✓</span>
+            <span>Telegram Mini App (Neon Dark boshqaruv paneli)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-neon-emerald font-black">✓</span>
+            <span>Guruhda tahrirlangan (edit) xabarlarni darhol to'g'irlash</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-neon-emerald font-black">✓</span>
+            <span>1-tugma bilan Excel (.xlsx) hisobotlarni cheksiz yuklash</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-neon-emerald font-black">✓</span>
+            <span>24/7 bulutli server xarajatlari narx ichida</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-neon-emerald font-black">✓</span>
+            <span>Shaxsiy texnik yordam va doimiy yangilanishlar</span>
+          </div>
+        </div>
+
+        <!-- ASOSIY SOTIB OLISH TUGMASI -->
+        <button onclick="buySubscription()" class="w-full neon-shimmer-btn text-black font-black text-sm py-3.5 rounded-2xl shadow-xl shadow-purple-500/25 active:scale-98 transition-all flex items-center justify-center gap-2 mt-2">
+          <span>🚀</span>
+          <span>Sotib Olish — 777 000 so'm</span>
+        </button>
+
+        <p class="text-[10px] text-slate-400 text-center">
+          Tugmani bosganda Telegram'da <b class="text-white">@fbr_a</b> lichkasiga <i>"men sotib olmoqchiman"</i> yozuvi bilan ulanasiz.
+        </p>
+
+      </div>
+
+      <!-- FAQ (SAVOL-JAVOBLAR) -->
+      <div class="glass-card p-4 rounded-3xl border border-white/10 space-y-3">
+        <h3 class="text-xs font-black text-white uppercase tracking-wider">Tez-tez so'raladigan savollar</h3>
+        
+        <div class="space-y-2 text-xs">
+          <div class="p-2.5 rounded-xl bg-cyber-850/60 border border-white/5 space-y-1">
+            <div class="font-bold text-cyan-400">❓ Botni guruhimga qanday ulayman?</div>
+            <div class="text-[11px] text-slate-300">Botni guruhingizga admin qilib qo'shasiz va tamom! Qolgan barcha sozlamalarni mutaxassisimiz 10 daqiqada tayyorlab beradi.</div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-cyber-850/60 border border-white/5 space-y-1">
+            <div class="font-bold text-cyan-400">❓ Guruhdagilar hisobotlarni ko'rib qolmaydimi?</div>
+            <div class="text-[11px] text-slate-300">Yo'q! Bot guruhda butunlay jim ishlaydi. Hamma hisobotlar faqat va faqat sizning shaxsiy chatingizga va Mini Appga boradi.</div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-cyber-850/60 border border-white/5 space-y-1">
+            <div class="font-bold text-cyan-400">❓ To'lov qanday amalga oshiriladi?</div>
+            <div class="text-[11px] text-slate-300">Click, Payme yoki karta orqali @fbr_a bilan shaxsiy chatda qulay to'lov qilasiz.</div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
-    <!-- ================= TAB 4: PUL KELDI (TO'LOVLAR) ================= -->
-    <div id="tab-pul_keldi" class="tab-content hidden space-y-3">
-      <div class="relative">
-        <input type="text" id="search-pul_keldi" oninput="debounceSearch('pul_keldi')" placeholder="Pul to'lagan mijozni qidirish..." class="w-full bg-dark-850 border border-white/10 rounded-2xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
-        <svg class="w-4 h-4 text-slate-500 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-      </div>
-      <div id="pul_keldi-records-list" class="space-y-2"></div>
-    </div>
-
-    <!-- ================= TAB 5: MIJOZLAR BAZASI (CRM) ================= -->
+    <!-- ================= TAB 4: MIJOZLAR BAZASI (CRM) ================= -->
     <div id="tab-customers" class="tab-content hidden space-y-3">
+      
+      <!-- QIDIRUV INPUT -->
       <div class="relative">
-        <input type="text" id="search-customers" oninput="debounceSearch('customers')" placeholder="Mijozlar bazasidan qidirish..." class="w-full bg-dark-850 border border-white/10 rounded-2xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500">
+        <input type="text" id="search-customers" oninput="debounceSearch('customers')" placeholder="Mijoz ismi yoki firmasini qidirish..." class="w-full bg-cyber-850 border border-white/10 rounded-2xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition-colors">
         <svg class="w-4 h-4 text-slate-500 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
       </div>
-      <div id="customers-list" class="space-y-2.5"></div>
+
+      <!-- MIJOZLAR RO'YXATI -->
+      <div id="customers-list" class="space-y-2.5">
+        <!-- JS orqali ineksiya qilinadi -->
+      </div>
+    </div>
+
+    <!-- ================= TAB 5: BARCHA SAVDOLAR & HARAKATLAR ================= -->
+    <div id="tab-records" class="tab-content hidden space-y-3">
+      
+      <!-- TOIFA FILTRI (Naqd / Nasiya / Pul keldi) -->
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-bold">
+        <button onclick="filterRecordsCategory('all')" id="rec-cat-all" class="rec-cat-btn px-3 py-1.5 rounded-xl bg-cyan-600 text-white flex-shrink-0 transition-all">Hammasi</button>
+        <button onclick="filterRecordsCategory('naqd')" id="rec-cat-naqd" class="rec-cat-btn px-3 py-1.5 rounded-xl bg-cyber-850 text-slate-400 border border-white/5 flex-shrink-0 transition-all">💵 Naqd</button>
+        <button onclick="filterRecordsCategory('nasiya')" id="rec-cat-nasiya" class="rec-cat-btn px-3 py-1.5 rounded-xl bg-cyber-850 text-slate-400 border border-white/5 flex-shrink-0 transition-all">📑 Nasiya</button>
+        <button onclick="filterRecordsCategory('pul_keldi')" id="rec-cat-pul_keldi" class="rec-cat-btn px-3 py-1.5 rounded-xl bg-cyber-850 text-slate-400 border border-white/5 flex-shrink-0 transition-all">💰 Pul Keldi</button>
+      </div>
+
+      <!-- QIDIRUV -->
+      <div class="relative">
+        <input type="text" id="search-records" oninput="debounceSearch('records')" placeholder="Tovar nomi, mijoz ismi bo'yicha qidiruv..." class="w-full bg-cyber-850 border border-white/10 rounded-2xl py-2.5 pl-10 pr-4 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-colors">
+        <svg class="w-4 h-4 text-slate-500 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      </div>
+
+      <!-- RO'YXAT -->
+      <div id="records-list" class="space-y-2">
+        <!-- JS orqali ineksiya qilinadi -->
+      </div>
     </div>
 
   </main>
 
   <!-- ================= FLOATING ACTION BUTTON (YANGI QO'SHISH) ================= -->
-  <button onclick="openAddModal()" class="fixed bottom-20 right-4 z-40 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3.5 rounded-full shadow-lg shadow-blue-500/30 active:scale-95 transition-all flex items-center justify-center">
-    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+  <button onclick="openAddModal()" class="fixed bottom-20 right-4 z-40 bg-gradient-to-tr from-cyan-500 to-indigo-600 text-white p-3.5 rounded-2xl shadow-xl shadow-cyan-500/30 active:scale-90 transition-all flex items-center justify-center">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
   </button>
 
   <!-- ================= BOTTOM NAVIGATION (TAB BAR) ================= -->
-  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-dark-900/95 backdrop-blur-xl border-t border-white/10 px-1 py-2 flex items-center justify-around max-w-md mx-auto">
-    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn flex flex-col items-center gap-1 text-blue-400 py-1 px-2.5 rounded-xl transition-all">
+  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-cyber-900/90 backdrop-blur-2xl border-t border-white/10 px-2 py-2 flex items-center justify-around max-w-md mx-auto">
+    
+    <!-- 1. Asosiy -->
+    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn flex flex-col items-center gap-1 text-cyan-400 py-1 px-2 rounded-xl transition-all">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-      <span class="text-[9px] font-semibold">Asosiy</span>
+      <span class="text-[9px] font-bold">Asosiy</span>
     </button>
-    <button onclick="switchTab('naqd')" id="nav-naqd" class="nav-btn flex flex-col items-center gap-1 text-slate-400 py-1 px-2.5 rounded-xl transition-all">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-      <span class="text-[9px] font-semibold">Naqd</span>
+
+    <!-- 2. Funksiyalar -->
+    <button onclick="switchTab('features')" id="nav-features" class="nav-btn flex flex-col items-center gap-1 text-slate-400 py-1 px-2 rounded-xl transition-all">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      <span class="text-[9px] font-bold">Funksiyalar</span>
     </button>
-    <button onclick="switchTab('nasiya')" id="nav-nasiya" class="nav-btn flex flex-col items-center gap-1 text-slate-400 py-1 px-2.5 rounded-xl transition-all">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-      <span class="text-[9px] font-semibold">Nasiya</span>
-    </button>
-    <button onclick="switchTab('pul_keldi')" id="nav-pul_keldi" class="nav-btn flex flex-col items-center gap-1 text-slate-400 py-1 px-2.5 rounded-xl transition-all">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-      <span class="text-[9px] font-semibold">Pul Keldi</span>
-    </button>
-    <button onclick="switchTab('customers')" id="nav-customers" class="nav-btn flex flex-col items-center gap-1 text-slate-400 py-1 px-2.5 rounded-xl transition-all">
+
+    <!-- 3. Mijozlar (CRM) -->
+    <button onclick="switchTab('customers')" id="nav-customers" class="nav-btn flex flex-col items-center gap-1 text-slate-400 py-1 px-2 rounded-xl transition-all">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-      <span class="text-[9px] font-semibold">Mijozlar</span>
+      <span class="text-[9px] font-bold">Mijozlar</span>
     </button>
+
+    <!-- 4. Savdolar -->
+    <button onclick="switchTab('records')" id="nav-records" class="nav-btn flex flex-col items-center gap-1 text-slate-400 py-1 px-2 rounded-xl transition-all">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+      <span class="text-[9px] font-bold">Savdolar</span>
+    </button>
+
+    <!-- 5. Tarif (777k) -->
+    <button onclick="switchTab('pricing')" id="nav-pricing" class="nav-btn flex flex-col items-center gap-1 text-purple-400 py-1 px-2 rounded-xl transition-all relative">
+      <span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-neon-purple shadow-[0_0_8px_#A855F7]"></span>
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span class="text-[9px] font-black text-neon-purple">Tarif 777k</span>
+    </button>
+
   </nav>
 
   <!-- ================= MODAL: YANGI YOZUV QO'SHISH ================= -->
-  <div id="add-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-end justify-center">
-    <div class="bg-dark-850 border-t border-white/10 rounded-t-3xl w-full max-w-md p-5 space-y-3.5 max-h-[90vh] overflow-y-auto">
+  <div id="add-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-end justify-center">
+    <div class="bg-cyber-850 border-t border-white/10 rounded-t-3xl w-full max-w-md p-5 space-y-3.5 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between pb-2 border-b border-white/5">
-        <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <span>➕ Yangi Operatsiya</span>
+        <h3 class="text-sm font-black text-white flex items-center gap-2">
+          <span>➕ Yangi Operatsiya Kiritish</span>
         </h3>
         <button onclick="closeAddModal()" class="text-slate-400 hover:text-white p-1">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -275,43 +690,43 @@
       <form id="add-form" onsubmit="submitNewRecord(event)" class="space-y-3">
         <!-- Toifa tanlash -->
         <div>
-          <label class="block text-[11px] font-semibold text-slate-400 mb-1">Operatsiya toifasi:</label>
+          <label class="block text-[11px] font-bold text-slate-300 mb-1">Toifasi:</label>
           <div class="grid grid-cols-3 gap-2">
             <label class="cursor-pointer">
               <input type="radio" name="modal_category" value="naqd" checked onchange="toggleFormFields()" class="peer sr-only">
-              <div class="p-2 rounded-xl text-center text-xs font-bold border border-white/5 bg-dark-750 peer-checked:bg-emerald-600 peer-checked:text-white transition-all">💵 Naqd</div>
+              <div class="p-2.5 rounded-xl text-center text-xs font-black border border-white/5 bg-cyber-800 peer-checked:bg-emerald-600 peer-checked:text-white transition-all">💵 Naqd</div>
             </label>
             <label class="cursor-pointer">
               <input type="radio" name="modal_category" value="nasiya" onchange="toggleFormFields()" class="peer sr-only">
-              <div class="p-2 rounded-xl text-center text-xs font-bold border border-white/5 bg-dark-750 peer-checked:bg-red-600 peer-checked:text-white transition-all">📑 Nasiya</div>
+              <div class="p-2.5 rounded-xl text-center text-xs font-black border border-white/5 bg-cyber-800 peer-checked:bg-rose-600 peer-checked:text-white transition-all">📑 Nasiya</div>
             </label>
             <label class="cursor-pointer">
               <input type="radio" name="modal_category" value="pul_keldi" onchange="toggleFormFields()" class="peer sr-only">
-              <div class="p-2 rounded-xl text-center text-xs font-bold border border-white/5 bg-dark-750 peer-checked:bg-blue-600 peer-checked:text-white transition-all">💰 Pul Keldi</div>
+              <div class="p-2.5 rounded-xl text-center text-xs font-black border border-white/5 bg-cyber-800 peer-checked:bg-cyan-600 peer-checked:text-white transition-all">💰 Pul Keldi</div>
             </label>
           </div>
         </div>
 
-        <!-- Mijoz ismi (Nasiya va Pul keldi uchun) -->
+        <!-- Mijoz ismi -->
         <div id="field-partner">
-          <label class="block text-[11px] font-semibold text-slate-400 mb-1">Mijoz ismi / Firma:</label>
-          <input type="text" id="modal_partner_name" placeholder="Akmal aka, Jamshid do'kon..." class="w-full bg-dark-750 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+          <label class="block text-[11px] font-bold text-slate-300 mb-1">Mijoz / Firma nomi:</label>
+          <input type="text" id="modal_partner_name" placeholder="Akmal aka, Jamshid Samarqand..." class="w-full bg-cyber-800 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400">
         </div>
 
-        <!-- Tovar nomi (Naqd va Nasiya uchun) -->
+        <!-- Tovar nomi -->
         <div id="field-item">
-          <label class="block text-[11px] font-semibold text-slate-400 mb-1">Tovar nomi:</label>
-          <input type="text" id="modal_item_name" placeholder="olmanok, sement, profil..." class="w-full bg-dark-750 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+          <label class="block text-[11px] font-bold text-slate-300 mb-1">Tovar nomi:</label>
+          <input type="text" id="modal_item_name" placeholder="olmanok, sement, un..." class="w-full bg-cyber-800 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400">
         </div>
 
         <div id="field-qty-price" class="grid grid-cols-2 gap-2">
           <div>
-            <label class="block text-[11px] font-semibold text-slate-400 mb-1">Miqdori:</label>
-            <input type="number" step="any" id="modal_quantity" placeholder="2" class="w-full bg-dark-750 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">Miqdori:</label>
+            <input type="number" step="any" id="modal_quantity" placeholder="10" class="w-full bg-cyber-800 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400">
           </div>
           <div>
-            <label class="block text-[11px] font-semibold text-slate-400 mb-1">Narxi (ming so'mda):</label>
-            <input type="number" step="any" id="modal_price" placeholder="170 (170 000 bo'ladi)" class="w-full bg-dark-750 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+            <label class="block text-[11px] font-bold text-slate-300 mb-1">Narxi (ming so'mda):</label>
+            <input type="number" step="any" id="modal_price" placeholder="170 (170 000 bo'ladi)" class="w-full bg-cyber-800 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400">
           </div>
         </div>
 
@@ -319,37 +734,41 @@
         <div id="field-payment" class="hidden space-y-2">
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block text-[11px] font-semibold text-slate-400 mb-1">Valyuta:</label>
-              <select id="modal_currency" onchange="toggleCurrencyField()" class="w-full bg-dark-750 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+              <label class="block text-[11px] font-bold text-slate-300 mb-1">Valyuta:</label>
+              <select id="modal_currency" onchange="toggleCurrencyField()" class="w-full bg-cyber-800 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400">
                 <option value="UZS">So'm (UZS)</option>
                 <option value="USD">Dollar ($ USD)</option>
               </select>
             </div>
             <div>
-              <label class="block text-[11px] font-semibold text-slate-400 mb-1">To'langan Summa:</label>
-              <input type="number" step="any" id="modal_payment_amount" placeholder="500000 yoki 100$" class="w-full bg-dark-750 border border-white/5 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+              <label class="block text-[11px] font-bold text-slate-300 mb-1">To'lov summasi:</label>
+              <input type="number" step="any" id="modal_payment_amount" placeholder="500000 yoki 100$" class="w-full bg-cyber-800 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400">
             </div>
           </div>
         </div>
 
-        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl text-xs shadow-lg shadow-blue-600/30 active:scale-98 transition-all mt-2">
-          Saqlash
+        <button type="submit" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold py-3 rounded-xl text-xs shadow-lg shadow-cyan-500/25 active:scale-98 transition-all mt-2">
+          Bazada Saqlash
         </button>
       </form>
     </div>
   </div>
 
-  <!-- ================= JAVASCRIPT LOGIKA ================= -->
+  <!-- ================= JAVASCRIPT ================= -->
   <script>
     const tg = window.Telegram?.WebApp;
     if (tg) {
       tg.ready();
       tg.expand();
-      try { tg.headerColor = '#0B0F17'; tg.backgroundColor = '#0B0F17'; } catch (e) {}
+      try {
+        tg.headerColor = '#06090F';
+        tg.backgroundColor = '#06090F';
+      } catch (e) {}
     }
 
     let currentPeriod = '7days';
     let currentTab = 'dashboard';
+    let currentCategoryFilter = 'all';
     let salesChartInstance = null;
     let debtChartInstance = null;
     let liveUsdRate = 12000;
@@ -359,55 +778,70 @@
       return Number(num).toLocaleString('uz-UZ').replace(/,/g, ' ');
     }
 
+    // Telegram chatiga sotib olish havolasi
+    function buySubscription() {
+      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      const text = encodeURIComponent("men sotib olmoqchiman");
+      const url = `https://t.me/fbr_a?text=${text}`;
+      if (tg?.openTelegramLink) {
+        tg.openTelegramLink(url);
+      } else {
+        window.open(url, "_blank");
+      }
+    }
+
     function switchTab(tab) {
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
       currentTab = tab;
       
       document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-      document.getElementById(`tab-${tab}`).classList.remove('hidden');
+      const activeTabEl = document.getElementById(`tab-${tab}`);
+      if (activeTabEl) activeTabEl.classList.remove('hidden');
 
       document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.classList.remove('text-blue-400');
+        btn.classList.remove('text-cyan-400', 'text-purple-400');
         btn.classList.add('text-slate-400');
       });
+
       const activeBtn = document.getElementById(`nav-${tab}`);
       if (activeBtn) {
-        activeBtn.classList.add('text-blue-400');
+        if (tab === 'pricing') {
+          activeBtn.classList.add('text-purple-400');
+        } else {
+          activeBtn.classList.add('text-cyan-400');
+        }
         activeBtn.classList.remove('text-slate-400');
       }
 
-      if (tab === 'naqd') loadRecords('naqd');
-      if (tab === 'nasiya') loadRecords('nasiya');
-      if (tab === 'pul_keldi') loadRecords('pul_keldi');
       if (tab === 'customers') loadCustomers();
+      if (tab === 'records') loadRecords();
+      if (tab === 'dashboard') loadDashboardStats();
     }
 
     function changePeriod(period) {
-      if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
       currentPeriod = period;
 
       document.querySelectorAll('.period-btn').forEach(btn => {
-        btn.classList.remove('bg-blue-600', 'text-white', 'shadow');
-        btn.classList.add('text-slate-400');
+        btn.className = "period-btn flex-1 py-1.5 text-center rounded-xl transition-all text-slate-400";
       });
       const activeBtn = document.getElementById(`period-${period}`);
-      activeBtn.classList.add('bg-blue-600', 'text-white', 'shadow');
-      activeBtn.classList.remove('text-slate-400');
+      if (activeBtn) {
+        activeBtn.className = "period-btn flex-1 py-1.5 text-center rounded-xl transition-all bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/25";
+      }
 
       loadDashboardStats();
     }
 
     function applyDashboardData(data) {
-      if (!data) return;
       const kpi = data.kpi || {};
-
+      
       if (data.current_usd_rate) {
         liveUsdRate = data.current_usd_rate;
         const badge = document.getElementById('usd-rate-badge');
-        if (badge) badge.innerHTML = `<span>💵 1$ = ${formatNumber(liveUsdRate)} so'm (MB kursi)</span>`;
+        if (badge) badge.innerText = `💵 1$ = ${formatNumber(liveUsdRate)} so'm`;
       }
 
-      // KPI
       const elNaqdSum = document.getElementById('kpi-naqd-sum');
       const elNaqdCount = document.getElementById('kpi-naqd-count');
       const elNasiyaSum = document.getElementById('kpi-nasiya-sum');
@@ -424,13 +858,8 @@
       if (elPaidCount) elPaidCount.innerText = `${kpi.count_paid || 0} ta`;
       if (elDebtSum) elDebtSum.innerText = formatNumber(kpi.total_debtors_balance) + ' so\'m';
 
-      // 1. Grafik: Naqd vs Nasiya
       if (data.chart) renderSalesChart(data.chart);
-
-      // 2. Top Qarzdorlar
       if (data.top_debtors) renderDebtDoughnut(data.top_debtors);
-
-      // 3. Oxirgi operatsiyalar
       if (data.recent_records) renderRecentTransactions(data.recent_records);
     }
 
@@ -444,7 +873,6 @@
     }
 
     async function loadDashboardStats() {
-      // 1. Dastlab 0 soniyada keshlangan ma'lumotni darhol ko'rsatish (qotmaslik uchun):
       loadCachedDashboard();
 
       try {
@@ -460,12 +888,23 @@
     }
 
     function renderSalesChart(chartData) {
-      const ctx = document.getElementById('salesChart').getContext('2d');
+      const canvas = document.getElementById('salesChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
       if (salesChartInstance) salesChartInstance.destroy();
 
       const labels = chartData?.labels || [];
       const naqdData = chartData?.naqd || [];
       const nasiyaData = chartData?.nasiya || [];
+
+      // Neon Gradient fills
+      const gradientNaqd = ctx.createLinearGradient(0, 0, 0, 180);
+      gradientNaqd.addColorStop(0, 'rgba(0, 245, 160, 0.45)');
+      gradientNaqd.addColorStop(1, 'rgba(0, 245, 160, 0.0)');
+
+      const gradientNasiya = ctx.createLinearGradient(0, 0, 0, 180);
+      gradientNasiya.addColorStop(0, 'rgba(255, 51, 102, 0.45)');
+      gradientNasiya.addColorStop(1, 'rgba(255, 51, 102, 0.0)');
 
       salesChartInstance = new Chart(ctx, {
         type: 'line',
@@ -475,21 +914,27 @@
             {
               label: 'Naqd',
               data: naqdData,
-              borderColor: '#10B981',
-              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              borderColor: '#00F5A0',
               borderWidth: 2.5,
-              tension: 0.35,
+              backgroundColor: gradientNaqd,
               fill: true,
+              tension: 0.38,
+              pointBackgroundColor: '#00F5A0',
+              pointBorderColor: '#06090F',
+              pointBorderWidth: 2,
               pointRadius: 3
             },
             {
               label: 'Nasiya',
               data: nasiyaData,
-              borderColor: '#EF4444',
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+              borderColor: '#FF3366',
               borderWidth: 2.5,
-              tension: 0.35,
+              backgroundColor: gradientNasiya,
               fill: true,
+              tension: 0.38,
+              pointBackgroundColor: '#FF3366',
+              pointBorderColor: '#06090F',
+              pointBorderWidth: 2,
               pointRadius: 3
             }
           ]
@@ -497,14 +942,21 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
           plugins: { legend: { display: false } },
           scales: {
-            x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#64748B', font: { size: 10 } } },
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#64748B', font: { size: 10, weight: '600' } }
+            },
             y: {
               grid: { color: 'rgba(255, 255, 255, 0.05)' },
               ticks: {
-                color: '#64748B', font: { size: 9 },
-                callback: function(v) { return v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v); }
+                color: '#64748B',
+                font: { size: 9, weight: '600' },
+                callback: function(v) {
+                  return v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v);
+                }
               }
             }
           }
@@ -513,7 +965,9 @@
     }
 
     function renderDebtDoughnut(debtors) {
-      const ctx = document.getElementById('debtDoughnutChart').getContext('2d');
+      const canvas = document.getElementById('debtDoughnutChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
       if (debtChartInstance) debtChartInstance.destroy();
 
       const listContainer = document.getElementById('top-debtors-list');
@@ -524,19 +978,19 @@
         return;
       }
 
-      const colors = ['#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#3B82F6'];
+      const colors = ['#FFB800', '#FF3366', '#A855F7', '#00F2FE', '#00F5A0'];
       const labels = debtors.map(d => d.partner_name || 'Mijoz');
       const dataValues = debtors.map(d => d.balance || 0);
 
       debtors.forEach((d, idx) => {
         const color = colors[idx % colors.length];
         listContainer.innerHTML += `
-          <div class="flex items-center justify-between text-[11px] truncate">
+          <div class="flex items-center justify-between text-[11px] truncate py-0.5">
             <span class="flex items-center gap-1.5 truncate text-slate-300">
-              <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: ${color}"></span>
-              <span class="truncate">${d.partner_name}</span>
+              <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: ${color}; box-shadow: 0 0 6px ${color}"></span>
+              <span class="truncate font-semibold">${d.partner_name}</span>
             </span>
-            <span class="font-bold text-amber-400 flex-shrink-0">${formatNumber(d.balance)}</span>
+            <span class="font-extrabold text-amber-400 flex-shrink-0 ml-1">${formatNumber(d.balance)}</span>
           </div>
         `;
       });
@@ -558,22 +1012,23 @@
 
     function renderRecentTransactions(records) {
       const container = document.getElementById('recent-transactions-list');
+      if (!container) return;
       container.innerHTML = '';
 
       if (!records || records.length === 0) {
-        container.innerHTML = '<div class="text-slate-500 text-xs py-2 text-center">Hali operatsiyalar yo\'q</div>';
+        container.innerHTML = '<div class="text-slate-500 text-xs py-3 text-center">Hali operatsiyalar yo\'q</div>';
         return;
       }
 
       records.forEach(r => {
         const cat = r.category;
-        let badgeColor = 'text-slate-400 bg-white/5';
+        let badgeColor = 'text-slate-400 bg-white/5 border-white/10';
         let badgeText = 'Savdo';
 
-        if (cat === 'naqd') { badgeColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'; badgeText = 'Naqd'; }
-        else if (cat === 'nasiya') { badgeColor = 'text-red-400 bg-red-500/10 border-red-500/20'; badgeText = 'Nasiya'; }
-        else if (cat === 'pul_keldi') { badgeColor = 'text-blue-400 bg-blue-500/10 border-blue-500/20'; badgeText = 'To\'lov'; }
-        else if (cat === 'kelim') { badgeColor = 'text-teal-400 bg-teal-500/10 border-teal-500/20'; badgeText = 'Kirim'; }
+        if (cat === 'naqd') { badgeColor = 'text-neon-emerald bg-emerald-500/10 border-emerald-500/30'; badgeText = 'Naqd'; }
+        else if (cat === 'nasiya') { badgeColor = 'text-neon-rose bg-rose-500/10 border-rose-500/30'; badgeText = 'Nasiya'; }
+        else if (cat === 'pul_keldi') { badgeColor = 'text-neon-cyan bg-cyan-500/10 border-cyan-500/30'; badgeText = 'To\'lov'; }
+        else if (cat === 'kelim') { badgeColor = 'text-purple-400 bg-purple-500/10 border-purple-500/30'; badgeText = 'Kirim'; }
 
         const title = r.partner_name ? `${r.partner_name}: ${r.item_name || 'To\'lov'}` : (r.item_name || 'Tovar');
         let amountText = `${formatNumber(r.total_amount)} so'm`;
@@ -583,70 +1038,26 @@
 
         container.innerHTML += `
           <div class="pt-2 flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2 truncate">
-              <span class="px-1.5 py-0.5 rounded text-[10px] font-bold border ${badgeColor}">${badgeText}</span>
+            <div class="flex items-center gap-2.5 truncate">
+              <span class="px-2 py-0.5 rounded-full text-[9px] font-black border ${badgeColor}">${badgeText}</span>
               <div class="truncate">
-                <div class="text-xs font-semibold text-white truncate">${title}</div>
-                <div class="text-[9px] text-slate-500">${r.date_str} ${r.time_str}</div>
+                <div class="text-xs font-bold text-white truncate">${title}</div>
+                <div class="text-[9px] text-slate-500 font-semibold">${r.date_str} ${r.time_str}</div>
               </div>
             </div>
             <div class="text-right flex-shrink-0">
-              <div class="text-xs font-bold text-slate-100">${amountText}</div>
+              <div class="text-xs font-black text-slate-100">${amountText}</div>
             </div>
           </div>
         `;
       });
     }
 
-    async function loadRecords(category) {
-      const searchInput = document.getElementById(`search-${category}`).value;
-      const container = document.getElementById(`${category}-records-list`);
-      container.innerHTML = '<div class="text-center text-slate-400 text-xs py-4">Yuklanmoqda...</div>';
-
-      try {
-        const res = await fetch(`/api/records?category=${category}&search=${encodeURIComponent(searchInput)}`);
-        const data = await res.json();
-        const records = data.records || [];
-
-        container.innerHTML = '';
-        if (records.length === 0) {
-          container.innerHTML = '<div class="text-center text-slate-500 text-xs py-6">Hech narsa topilmadi</div>';
-          return;
-        }
-
-        records.forEach(r => {
-          const title = r.item_name || r.partner_name || 'Operatsiya';
-          const partner = r.partner_name ? `Mijoz: ${r.partner_name}` : '';
-          const qtyText = r.quantity ? `${formatNumber(r.quantity)} ${r.unit || 'dona'}` : '';
-          
-          let sumText = `${formatNumber(r.total_amount)} so'm`;
-          if (r.currency === 'USD' && r.amount_usd) {
-            sumText = `$${formatNumber(r.amount_usd)} (${formatNumber(r.total_amount)} so'm)`;
-          }
-
-          container.innerHTML += `
-            <div class="glass-card p-3 rounded-2xl flex items-center justify-between border border-white/5">
-              <div class="space-y-0.5 truncate">
-                <div class="text-xs font-bold text-white truncate">${title}</div>
-                <div class="text-[10px] text-slate-400 truncate">${partner || r.raw_message}</div>
-                <div class="text-[9px] text-slate-500">${r.date_str} ${r.time_str}</div>
-              </div>
-              <div class="text-right flex-shrink-0 pl-2">
-                <div class="text-xs font-black ${category === 'naqd' ? 'text-emerald-400' : (category === 'nasiya' ? 'text-red-400' : 'text-blue-400')}">${sumText}</div>
-                <div class="text-[10px] font-semibold text-slate-400">${qtyText}</div>
-              </div>
-            </div>
-          `;
-        });
-      } catch (err) {
-        container.innerHTML = '<div class="text-center text-red-400 text-xs py-4">Xatolik yuz berdi</div>';
-      }
-    }
-
     async function loadCustomers() {
-      const searchInput = document.getElementById('search-customers').value;
+      const searchInput = document.getElementById('search-customers')?.value || '';
       const container = document.getElementById('customers-list');
-      container.innerHTML = '<div class="text-center text-slate-400 text-xs py-4">Yuklanmoqda...</div>';
+      if (!container) return;
+      container.innerHTML = '<div class="text-center text-cyan-400 text-xs py-6 font-bold">Yuklanmoqda...</div>';
 
       try {
         const res = await fetch(`/api/customers?search=${encodeURIComponent(searchInput)}`);
@@ -655,7 +1066,7 @@
 
         container.innerHTML = '';
         if (customers.length === 0) {
-          container.innerHTML = '<div class="text-center text-slate-500 text-xs py-6">Mijozlar topilmadi</div>';
+          container.innerHTML = '<div class="text-center text-slate-500 text-xs py-8">Mijozlar topilmadi</div>';
           return;
         }
 
@@ -663,32 +1074,98 @@
           const debt = c.current_balance || 0;
           const isDebtor = debt > 0;
           const statusBadge = isDebtor 
-            ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">Qarzdor: ${formatNumber(debt)}</span>`
-            : `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Hisob yopiq</span>`;
+            ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/15 text-neon-rose border border-rose-500/30">Qarz: ${formatNumber(debt)}</span>`
+            : `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/15 text-neon-emerald border border-emerald-500/30">Hisob yopiq</span>`;
 
           container.innerHTML += `
-            <div class="glass-card p-3.5 rounded-2xl space-y-2 border border-white/5">
+            <div class="glass-card p-3.5 rounded-2xl space-y-2 border border-white/10 ${isDebtor ? 'hover:border-rose-500/30' : ''}">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2.5 truncate">
-                  <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-xs font-black">
+                  <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center text-xs font-black">
                     ${idx + 1}
                   </div>
                   <div class="truncate">
-                    <div class="text-xs font-bold text-white truncate">${c.display_name}</div>
-                    <div class="text-[9px] text-slate-500">So'nggi faollik: ${c.last_updated ? c.last_updated.substring(0, 10) : '-'}</div>
+                    <div class="text-xs font-black text-white truncate">${c.display_name}</div>
+                    <div class="text-[9px] text-slate-500 font-semibold">So'nggi faollik: ${c.last_updated ? c.last_updated.substring(0, 10) : '-'}</div>
                   </div>
                 </div>
                 <div>${statusBadge}</div>
               </div>
               <div class="grid grid-cols-2 gap-2 pt-1 border-t border-white/5 text-[10px]">
-                <div class="text-slate-400">Jami olgan nasiyasi: <span class="font-bold text-white">${formatNumber(c.total_credit)}</span></div>
-                <div class="text-slate-400 text-right">To'lagan puli: <span class="font-bold text-emerald-400">${formatNumber(c.total_paid)}</span></div>
+                <div class="text-slate-400">Jami olgan nasiyasi: <span class="font-extrabold text-white">${formatNumber(c.total_credit)}</span></div>
+                <div class="text-slate-400 text-right">To'lagan puli: <span class="font-extrabold text-neon-emerald">${formatNumber(c.total_paid)}</span></div>
               </div>
             </div>
           `;
         });
       } catch (err) {
-        container.innerHTML = '<div class="text-center text-red-400 text-xs py-4">Yuklashda xatolik</div>';
+        container.innerHTML = '<div class="text-center text-rose-400 text-xs py-4">Yuklashda xatolik yuz berdi</div>';
+      }
+    }
+
+    function filterRecordsCategory(cat) {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      currentCategoryFilter = cat;
+
+      document.querySelectorAll('.rec-cat-btn').forEach(b => {
+        b.className = "rec-cat-btn px-3 py-1.5 rounded-xl bg-cyber-850 text-slate-400 border border-white/5 flex-shrink-0 transition-all";
+      });
+      const activeBtn = document.getElementById(`rec-cat-${cat}`);
+      if (activeBtn) {
+        activeBtn.className = "rec-cat-btn px-3 py-1.5 rounded-xl bg-cyan-600 text-white shadow-lg shadow-cyan-500/25 flex-shrink-0 transition-all";
+      }
+
+      loadRecords();
+    }
+
+    async function loadRecords() {
+      const searchInput = document.getElementById('search-records')?.value || '';
+      const container = document.getElementById('records-list');
+      if (!container) return;
+      container.innerHTML = '<div class="text-center text-cyan-400 text-xs py-6 font-bold">Yuklanmoqda...</div>';
+
+      try {
+        const catParam = currentCategoryFilter === 'all' ? '' : currentCategoryFilter;
+        const res = await fetch(`/api/records?category=${catParam}&search=${encodeURIComponent(searchInput)}`);
+        const data = await res.json();
+        const records = data.records || [];
+
+        container.innerHTML = '';
+        if (records.length === 0) {
+          container.innerHTML = '<div class="text-center text-slate-500 text-xs py-8">Yozuvlar topilmadi</div>';
+          return;
+        }
+
+        records.forEach(r => {
+          const title = r.item_name || r.partner_name || 'Operatsiya';
+          const partner = r.partner_name ? `Mijoz: ${r.partner_name}` : '';
+          const qtyText = r.quantity ? `${formatNumber(r.quantity)} ${r.unit || 'ta'}` : '';
+          
+          let sumText = `${formatNumber(r.total_amount)} so'm`;
+          if (r.currency === 'USD' && r.amount_usd) {
+            sumText = `$${formatNumber(r.amount_usd)} (${formatNumber(r.total_amount)} so'm)`;
+          }
+
+          let catColor = 'text-cyan-400';
+          if (r.category === 'naqd') catColor = 'text-neon-emerald';
+          if (r.category === 'nasiya') catColor = 'text-neon-rose';
+
+          container.innerHTML += `
+            <div class="glass-card p-3.5 rounded-2xl flex items-center justify-between border border-white/10">
+              <div class="space-y-0.5 truncate">
+                <div class="text-xs font-black text-white truncate">${title}</div>
+                <div class="text-[10px] text-slate-400 truncate">${partner || r.raw_message}</div>
+                <div class="text-[9px] text-slate-500 font-semibold">${r.date_str} ${r.time_str}</div>
+              </div>
+              <div class="text-right flex-shrink-0 pl-2">
+                <div class="text-xs font-black ${catColor}">${sumText}</div>
+                <div class="text-[10px] font-bold text-slate-400">${qtyText}</div>
+              </div>
+            </div>
+          `;
+        });
+      } catch (err) {
+        container.innerHTML = '<div class="text-center text-rose-400 text-xs py-4">Xatolik yuz berdi</div>';
       }
     }
 
@@ -697,22 +1174,22 @@
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => {
         if (type === 'customers') loadCustomers();
-        else loadRecords(type);
+        else if (type === 'records') loadRecords();
       }, 300);
     }
 
     function refreshData() {
       const icon = document.getElementById('refresh-icon');
-      icon.classList.add('animate-spin');
+      if (icon) icon.classList.add('animate-spin');
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
 
       if (currentTab === 'dashboard') loadDashboardStats();
-      else if (currentTab === 'naqd') loadRecords('naqd');
-      else if (currentTab === 'nasiya') loadRecords('nasiya');
-      else if (currentTab === 'pul_keldi') loadRecords('pul_keldi');
       else if (currentTab === 'customers') loadCustomers();
+      else if (currentTab === 'records') loadRecords();
 
-      setTimeout(() => icon.classList.remove('animate-spin'), 600);
+      setTimeout(() => {
+        if (icon) icon.classList.remove('animate-spin');
+      }, 600);
     }
 
     function exportExcel() {
@@ -753,26 +1230,36 @@
       }
     }
 
+    function toggleCurrencyField() {
+      const curr = document.getElementById('modal_currency').value;
+      const input = document.getElementById('modal_payment_amount');
+      input.placeholder = curr === 'USD' ? '100$' : '500 000 so\'m';
+    }
+
     async function submitNewRecord(e) {
       e.preventDefault();
       const cat = document.querySelector('input[name="modal_category"]:checked').value;
-      const partner = document.getElementById('modal_partner_name').value;
-      const item = document.getElementById('modal_item_name').value;
-      const qty = document.getElementById('modal_quantity').value;
-      const price = document.getElementById('modal_price').value;
-      const cur = document.getElementById('modal_currency').value;
-      const payAmount = document.getElementById('modal_payment_amount').value;
+      const payload = { category: cat };
 
-      let payload = { category: cat, partner_name: partner };
-
-      if (cat === 'pul_keldi') {
-        payload.currency = cur;
-        if (cur === 'USD') payload.amount_usd = payAmount;
-        else payload.total_amount = payAmount;
-      } else {
-        payload.item_name = item;
-        payload.quantity = qty;
-        payload.price = price;
+      if (cat === 'naqd') {
+        payload.item_name = document.getElementById('modal_item_name').value;
+        payload.quantity = document.getElementById('modal_quantity').value;
+        payload.price = document.getElementById('modal_price').value;
+      } else if (cat === 'nasiya') {
+        payload.partner_name = document.getElementById('modal_partner_name').value;
+        payload.item_name = document.getElementById('modal_item_name').value;
+        payload.quantity = document.getElementById('modal_quantity').value;
+        payload.price = document.getElementById('modal_price').value;
+      } else if (cat === 'pul_keldi') {
+        payload.partner_name = document.getElementById('modal_partner_name').value;
+        payload.currency = document.getElementById('modal_currency').value;
+        const amt = parseFloat(document.getElementById('modal_payment_amount').value);
+        if (payload.currency === 'USD') {
+          payload.amount_usd = amt;
+          payload.total_amount = amt * liveUsdRate;
+        } else {
+          payload.total_amount = amt;
+        }
       }
 
       try {
@@ -786,16 +1273,19 @@
           if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
           closeAddModal();
           document.getElementById('add-form').reset();
-          toggleFormFields();
           refreshData();
+        } else {
+          alert('Xatolik: ' + (result.error || 'Noma\'lum xatolik'));
         }
       } catch (err) {
-        alert('Xatolik yuz berdi');
+        alert('Serverga ulanishda xatolik: ' + err.message);
       }
     }
 
-    toggleFormFields();
-    loadDashboardStats();
+    // Sahifa birinchi yuklanganda avtomatik chaqirish
+    document.addEventListener('DOMContentLoaded', () => {
+      loadDashboardStats();
+    });
   </script>
 </body>
 </html>
