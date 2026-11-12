@@ -978,10 +978,16 @@
   <script>
     const tg = window.Telegram?.WebApp;
     const tgUser = tg?.initDataUnsafe?.user;
-    const urlParams = new URLSearchParams(window.location.search);
-    const uidParam = urlParams.get('uid');
-    const currentUserId = uidParam || (tgUser ? tgUser.id : null);
-    const isAdmin = (currentUserId == 6656667725 || currentUserId == '6656667725');
+    const tgInitData = tg?.initData || '';
+    const currentUserId = tgUser ? tgUser.id : null;
+    // UI uchun taxminiy rol. Haqiqiy ruxsatni FAQAT server (initData imzosi orqali) beradi.
+    let isAdmin = (String(currentUserId) === '6656667725');
+
+    // Barcha API so'rovlari Telegram imzosi (initData) bilan yuboriladi
+    function apiFetch(url, options = {}) {
+      const headers = Object.assign({}, options.headers || {}, { 'X-Telegram-Init-Data': tgInitData });
+      return fetch(url, Object.assign({}, options, { headers }));
+    }
 
     let currentPeriod = '7days';
     // Admin uchun 'dashboard', mehmonlar uchun esa 'features' (Vitrina & Funksiyalar) ochiladi:
@@ -1065,8 +1071,8 @@
 
     async function loadDashboardStats() {
       try {
-        const adminQ = isAdmin ? `&uid=${currentUserId}` : '';
-        const res = await fetch(`/api/stats?period=${currentPeriod}${adminQ}`);
+        const adminQ = '';
+        const res = await apiFetch(`/api/stats?period=${currentPeriod}${adminQ}`);
         const data = await res.json();
         applyDashboardData(data);
       } catch (err) {
@@ -1314,8 +1320,8 @@
 
       // 2. Serverdan yangilab olish
       try {
-        const adminQ = isAdmin ? `&uid=${currentUserId}` : '';
-        const res = await fetch(`/api/customer-details?name=${encodeURIComponent(partnerName)}${adminQ}`);
+        const adminQ = '';
+        const res = await apiFetch(`/api/customer-details?name=${encodeURIComponent(partnerName)}${adminQ}`);
         const data = await res.json();
         try { localStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) {}
         renderCustomerModalData(data, partnerName);
@@ -1337,8 +1343,8 @@
       container.innerHTML = '<div style="text-align:center; color:#00F2FE; font-size:11px; padding:20px;">Yuklanmoqda...</div>';
 
       try {
-        const adminQ = `&uid=${currentUserId}&order=${currentSortOrder}`;
-        const res = await fetch(`/api/customers?search=${encodeURIComponent(search)}${adminQ}`);
+        const adminQ = `&order=${currentSortOrder}`;
+        const res = await apiFetch(`/api/customers?search=${encodeURIComponent(search)}${adminQ}`);
         const data = await res.json();
         const customers = data.customers || [];
 
@@ -1394,8 +1400,8 @@
 
       try {
         const catQ = currentRecordCategory !== 'all' ? `&category=${currentRecordCategory}` : '';
-        const adminQ = `&uid=${currentUserId}${catQ}`;
-        const res = await fetch(`/api/records?search=${encodeURIComponent(search)}${adminQ}`);
+        const adminQ = `${catQ}`;
+        const res = await apiFetch(`/api/records?search=${encodeURIComponent(search)}${adminQ}`);
         const data = await res.json();
         const records = data.records || [];
 
@@ -1465,7 +1471,15 @@
         switchTab('pricing');
         return;
       }
-      window.location.href = `/api/export-excel?uid=${currentUserId}`;
+      apiFetch('/api/export-excel?via=telegram')
+        .then(r => r.json())
+        .then(d => {
+          const msg = d.sent_to_chat
+            ? "✅ Excel hisobot Telegram chatingizga yuborildi."
+            : "❌ Excel yuborilmadi: " + (d.error || "noma'lum xatolik");
+          if (tg?.showAlert) tg.showAlert(msg); else alert(msg);
+        })
+        .catch(() => { if (tg?.showAlert) tg.showAlert("❌ Tarmoq xatoligi. Qayta urinib ko'ring."); });
     }
 
     function initApp() {
@@ -1497,6 +1511,24 @@
         switchTab('features');
       }
       loadDashboardStats();
+
+      // Serverdan kriptografik autentifikatsiyani tekshirib olish
+      apiFetch('/api/me')
+        .then(r => r.json())
+        .then(d => {
+          if (d && typeof d.is_admin === 'boolean') {
+            isAdmin = d.is_admin;
+            if (roleBadge) {
+              roleBadge.innerText = isAdmin ? '👑 Boshqaruvchi: ' + (d.first_name || 'Muslimjon') : '🚀 Vitrina & Taqdimot';
+            }
+            if (demoBanner) demoBanner.style.display = isAdmin ? 'none' : 'block';
+            if (guestCustLocked) guestCustLocked.style.display = isAdmin ? 'none' : 'block';
+            if (adminCustContent) adminCustContent.style.display = isAdmin ? 'block' : 'none';
+            if (guestRecLocked) guestRecLocked.style.display = isAdmin ? 'none' : 'block';
+            if (adminRecContent) adminRecContent.style.display = isAdmin ? 'block' : 'none';
+          }
+        })
+        .catch(() => {});
     }
 
     // Sahifa yuklanishi bilan ishga tushirish

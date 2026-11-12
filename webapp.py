@@ -1,10 +1,16 @@
 import io
 import os
+import hmac
+import json
+import time
+import hashlib
 import logging
+from typing import Optional
+from urllib.parse import parse_qsl
 from datetime import datetime, timezone
 from flask import Flask, jsonify, request, send_from_directory, send_file
 import telebot
-from config import WEB_APP_PORT, BOT_MODE, WEBHOOK_SECRET, ENVIRONMENT, ADMIN_IDS
+from config import WEB_APP_PORT, BOT_MODE, WEBHOOK_SECRET, ENVIRONMENT, ADMIN_IDS, BOT_TOKEN
 from database import (
     get_advanced_stats,
     get_filtered_records,
@@ -63,14 +69,61 @@ def webhook(secret=None):
         return "ok", 200
     return "unsupported media", 400
 
+INIT_DATA_MAX_AGE = 7 * 24 * 3600  # initData 7 kun amal qiladi
+
+def verify_init_data(init_data: str) -> Optional[dict]:
+    """Telegram WebApp initData imzosini (HMAC-SHA256) tekshirish.
+    To'g'ri bo'lsa foydalanuvchi ma'lumotini qaytaradi, aks holda None.
+    https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app"""
+    if not init_data or not BOT_TOKEN:
+        return None
+    try:
+        pairs = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=True))
+    except ValueError:
+        return None
+    received_hash = pairs.pop("hash", None)
+    if not received_hash:
+        return None
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
+    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+    calc_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(calc_hash, received_hash):
+        return None
+    try:
+        auth_date = int(pairs.get("auth_date", "0"))
+    except ValueError:
+        return None
+    if time.time() - auth_date > INIT_DATA_MAX_AGE:
+        return None
+    try:
+        return json.loads(pairs.get("user", "{}"))
+    except ValueError:
+        return None
+
+def get_request_user(req) -> Optional[dict]:
+    init_data = req.headers.get("X-Telegram-Init-Data") or req.args.get("init_data") or ""
+    return verify_init_data(init_data)
+
 def is_admin_request(req) -> bool:
-    """Foydalanuvchi tizim egasi (admin) ekanligini xavfsiz tekshirish"""
-    uid_str = req.args.get("user_id") or req.args.get("uid") or req.headers.get("X-User-Id")
-    if uid_str and str(uid_str).strip().isdigit():
-        uid_val = int(str(uid_str).strip())
-        if uid_val in ADMIN_IDS or uid_val == 6656667725:
-            return True
-    return False
+    """Admin faqat Telegram imzosi tasdiqlangan initData orqali aniqlanadi.
+    URL dagi ?uid= endi QABUL QILINMAYDI (uni har kim soxtalashtirishi mumkin edi)."""
+    user = get_request_user(req)
+    if not user:
+        return False
+    try:
+        return int(user.get("id", 0)) in ADMIN_IDS
+    except (TypeError, ValueError):
+        return False
+
+@app.route("/api/me")
+def api_me():
+    """Mini App foydalanuvchining rolini serverdan bilib oladi"""
+    user = get_request_user(request)
+    return jsonify({
+        "authenticated": bool(user),
+        "is_admin": is_admin_request(request),
+        "first_name": (user or {}).get("first_name")
+    })
 
 @app.route("/api/stats")
 def api_stats():
@@ -293,7 +346,18 @@ def api_export_excel():
         records = get_all_records_for_export()
         buffer = create_excel_report(records)
         filename = f"MMM_Analytics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
+
+        # Mini App ichida fayl yuklab olish ko'p telefonlarda ishlamaydi,
+        # shuning uchun Excel to'g'ridan-to'g'ri adminning Telegram chatiga yuboriladi.
+        user = get_request_user(request)
+        if request.args.get("via") == "telegram" and _bot_instance and user:
+            _bot_instance.send_document(
+                int(user["id"]),
+                (filename, buffer.getvalue()),
+                caption="📊 <b>Excel hisobot</b> (Mini App orqali so'raldi)"
+            )
+            return jsonify({"success": True, "sent_to_chat": True})
+
         return send_file(
             buffer,
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

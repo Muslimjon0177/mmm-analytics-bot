@@ -96,6 +96,9 @@ def rebuild_all_customers(client=None):
             
             if cat == "nasiya":
                 cust_map[clean_key]["total_credit"] += tot
+            elif cat == "qaytarish":
+                # Qaytarilgan tovar mijozning nasiyasini kamaytiradi
+                cust_map[clean_key]["total_credit"] -= tot
             elif cat in ("pul_keldi", "to'lov", "tolov"):
                 cust_map[clean_key]["total_paid"] += tot
 
@@ -128,7 +131,9 @@ def _auto_migrate_legacy_data(client):
             lower_raw = raw.lower()
             
             new_cat = old_cat
-            if old_cat == "kelim" or "kelim" in lower_raw or "kirdi" in lower_raw or "fura" in lower_raw:
+            if old_cat == "qaytarish":
+                new_cat = "qaytarish"
+            elif old_cat == "kelim" or "kelim" in lower_raw or "kirdi" in lower_raw or "fura" in lower_raw:
                 new_cat = "kelim"
             elif old_cat in ("ostatka", "pul_keldi") or any(k in lower_raw for k in ["berdi", "to'ladi", "toladi", "yopdi", "pul keldi", "pul berdi", "oplata"]):
                 new_cat = "pul_keldi"
@@ -142,7 +147,7 @@ def _auto_migrate_legacy_data(client):
                 new_price = new_price * 1000
                 
             new_tot = tot or 0
-            if new_tot is not None and 0 < new_tot < 100000 and new_cat in ("naqd", "nasiya", "kelim"):
+            if new_tot is not None and 0 < new_tot < 1000 and new_cat in ("naqd", "nasiya", "kelim"):
                 new_tot = new_tot * 1000
                 
             if (not new_tot or new_tot == 0) and new_price and qty:
@@ -315,6 +320,14 @@ def update_customer_ledger(partner_name: str, category: str, amount: float):
                     last_updated = CURRENT_TIMESTAMP
                 WHERE id = ?
             """, [amount, amount, cust_id])
+        elif category == "qaytarish":
+            client.execute("""
+                UPDATE customers 
+                SET total_credit = total_credit - ?,
+                    current_balance = current_balance - ?,
+                    last_updated = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, [amount, amount, cust_id])
 
     except Exception as e:
         logger.error(f"Mijoz balansini yangilashda xatolik ({partner_name}): {e}")
@@ -331,10 +344,11 @@ def recalculate_customer_balance(partner_name: str):
     try:
         res = client.execute("""
             SELECT 
-                COALESCE(SUM(CASE WHEN category = 'nasiya' THEN total_amount ELSE 0 END), 0) as total_credit,
-                COALESCE(SUM(CASE WHEN category IN ('pul_keldi', 'to\'lov') THEN total_amount ELSE 0 END), 0) as total_paid
+                COALESCE(SUM(CASE WHEN category = 'nasiya' THEN total_amount
+                                  WHEN category = 'qaytarish' THEN -total_amount ELSE 0 END), 0) as total_credit,
+                COALESCE(SUM(CASE WHEN category IN ('pul_keldi', 'to''lov', 'tolov') THEN total_amount ELSE 0 END), 0) as total_paid
             FROM records
-            WHERE LOWER(partner_name) = ?
+            WHERE LOWER(TRIM(partner_name)) = ?
         """, [clean_key])
         
         tot_cred = float(res.rows[0][0]) if res.rows else 0.0
@@ -356,6 +370,39 @@ def recalculate_customer_balance(partner_name: str):
             
     except Exception as e:
         logger.error(f"recalculate_customer_balance xatolik: {e}")
+    finally:
+        client.close()
+
+def get_message_datetime(chat_id: int, message_id: int) -> Optional[tuple]:
+    """Xabarga tegishli mavjud yozuvning ASL sana va vaqtini qaytaradi (tuzatishda saqlab qolish uchun)"""
+    client = get_client()
+    try:
+        res = client.execute(
+            "SELECT date_str, time_str FROM records WHERE chat_id = ? AND message_id = ? ORDER BY id LIMIT 1",
+            [chat_id, message_id]
+        )
+        if res.rows:
+            return (res.rows[0][0], res.rows[0][1])
+        return None
+    finally:
+        client.close()
+
+def get_records_by_message(chat_id: int, message_id: int) -> List[Dict[str, Any]]:
+    client = get_client()
+    try:
+        res = client.execute("SELECT * FROM records WHERE chat_id = ? AND message_id = ? ORDER BY id", [chat_id, message_id])
+        return rows_to_dicts(res)
+    finally:
+        client.close()
+
+def customer_exists(partner_name: str) -> bool:
+    if not partner_name:
+        return False
+    key = normalize_partner_name(partner_name).lower()
+    client = get_client()
+    try:
+        res = client.execute("SELECT 1 FROM customers WHERE name = ? LIMIT 1", [key])
+        return bool(res.rows)
     finally:
         client.close()
 
@@ -440,10 +487,13 @@ def save_record(
     if price is not None and 0 < price < 1000:
         price = price * 1000
 
-    # 2. Jami summani hisoblash
-    if total_amount is None and price is not None and quantity is not None:
-        total_amount = float(price) * float(quantity)
-    elif total_amount is not None and 0 < total_amount < 100000 and category in ("naqd", "nasiya"):
+    # 2. Jami summa: soni va narxi ma'lum bo'lsa, summa HAR DOIM kod orqali hisoblanadi
+    #    (AI ning arifmetikasiga ishonilmaydi).
+    if price is not None and quantity is not None and quantity > 0:
+        total_amount = round(float(price) * float(quantity), 2)
+    elif total_amount is not None and 0 < total_amount < 1000 and category in ("naqd", "nasiya", "pul_keldi", "qaytarish") and currency != "USD":
+        # Faqat 1000 dan kichik summalar mingda deb hisoblanadi (masalan "500 berdi" -> 500 000).
+        # Avval bu chegara 100 000 edi va 50 000 so'mlik savdo 50 mln bo'lib qolishi mumkin edi.
         total_amount = total_amount * 1000
 
     # 3. Dollar kursi bo'yicha hisob-kitob
@@ -473,7 +523,7 @@ def save_record(
         client.close()
 
     # Mijoz balansini yangilash
-    if partner_name_cleaned and category in ("nasiya", "pul_keldi") and total_amount:
+    if partner_name_cleaned and category in ("nasiya", "pul_keldi", "qaytarish") and total_amount:
         update_customer_ledger(partner_name_cleaned, category, total_amount)
 
     try:
@@ -508,6 +558,11 @@ def get_daily_summary(target_date: Optional[str] = None) -> Dict[str, Any]:
         # Pul keldi
         r_pul = client.execute(
             "SELECT COUNT(*), COALESCE(SUM(total_amount), 0) FROM records WHERE date_str = ? AND category = 'pul_keldi'",
+            [target_date]
+        ).rows[0]
+        # Qaytarilgan tovarlar
+        r_qayt = client.execute(
+            "SELECT COUNT(*), COALESCE(SUM(total_amount), 0) FROM records WHERE date_str = ? AND category = 'qaytarish'",
             [target_date]
         ).rows[0]
         
@@ -552,6 +607,7 @@ def get_daily_summary(target_date: Optional[str] = None) -> Dict[str, Any]:
             "naqd": {"count": r_naqd[0], "total_sum": r_naqd[1], "qty": r_naqd[2]},
             "nasiya": {"count": r_nasiya[0], "total_sum": r_nasiya[1], "qty": r_nasiya[2]},
             "pul_keldi": {"count": r_pul[0], "total_sum": r_pul[1]},
+            "qaytarish": {"count": r_qayt[0], "total_sum": r_qayt[1]},
             "total_customer_debts": r_debt[0],
             "total_customers_count": r_cust_count,
             "debtors_count": r_debtors_count,
@@ -734,12 +790,14 @@ def get_customer_detail(partner_name: str) -> Optional[Dict[str, Any]]:
                 "current_balance": 0.0
             }
 
-        # 2. Ushbu mijozga tegishli barcha yozuvlar (Telegram sanasi va vaqti bilan)
+        # 2. Faqat AYNAN shu mijozga tegishli yozuvlar (Telegram sanasi va vaqti bilan).
+        # Eslatma: avval LIKE '%ism%' ishlatilgan edi - "Ali" kartochkasiga "Alisher" ham
+        # tushib qolardi. Endi faqat to'liq mos ism olinadi.
         r_res = client.execute("""
             SELECT * FROM records 
-            WHERE LOWER(partner_name) = ? OR LOWER(partner_name) LIKE ?
+            WHERE LOWER(TRIM(partner_name)) = ?
             ORDER BY date_str DESC, time_str DESC, id DESC
-        """, [clean_key, f"%{clean_key}%"])
+        """, [clean_key])
         records = rows_to_dicts(r_res)
 
         return {
