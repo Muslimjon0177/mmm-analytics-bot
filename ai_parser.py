@@ -1,5 +1,6 @@
 import json
 import re
+import base64
 import logging
 import urllib.request
 import urllib.error
@@ -91,6 +92,72 @@ def parse_with_gemini(text: str) -> Optional[Dict[str, Any]]:
             continue
 
     return None
+
+def parse_audio_with_gemini(audio_bytes: bytes, mime_type: str = "audio/ogg") -> Optional[Dict[str, Any]]:
+    """Ovozli xabarni (voice note) Gemini multimodal modeli orqali to'g'ridan-to'g'ri tahlil qilish"""
+    if not GEMINI_API_KEY or not audio_bytes:
+        return None
+
+    try:
+        encoded_audio = base64.b64encode(audio_bytes).decode("utf-8")
+    except Exception as be:
+        logger.error(f"Audio base64 kodlashda xatolik: {be}")
+        return None
+
+    models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest']
+    payload = {
+        "contents": [{
+            "parts": [
+                {
+                    "inline_data": {
+                        "mime_type": mime_type,
+                        "data": encoded_audio
+                    }
+                },
+                {
+                    "text": (
+                        f"{SYSTEM_PROMPT}\n\n"
+                        "Vazifa: Ushbu audio yozuvdagi o'zbekcha nutqni diqqat bilan eshitib, "
+                        "savdo va to'lov ma'lumotlarini qat'iy yuqoridagi JSON formatida ajrating. "
+                        "Agar audio mavzuga aloqasiz bo'lsa, is_relevant: false qaytaring."
+                    )
+                }
+            ]
+        }],
+        "generationConfig": {"responseMimeType": "application/json"}
+    }
+    data = json.dumps(payload).encode("utf-8")
+
+    for model_name in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                result_json = json.loads(response.read().decode("utf-8"))
+                candidates = result_json.get("candidates", [])
+                if candidates:
+                    raw_content = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+                    if raw_content.startswith("```json"):
+                        raw_content = raw_content[7:]
+                    if raw_content.startswith("```"):
+                        raw_content = raw_content[3:]
+                    if raw_content.endswith("```"):
+                        raw_content = raw_content[:-3]
+                    parsed = json.loads(raw_content.strip())
+                    return _sanitize_ai_result(parsed)
+        except Exception as e:
+            logger.warning(f"Gemini Audio ({model_name}) xatolik: {e}")
+            continue
+
+    return None
+
+def analyze_audio_message(audio_bytes: bytes, mime_type: str = "audio/ogg") -> Dict[str, Any]:
+    """Ovozli xabarni tahlil qilishning asosiy funksiyasi"""
+    res = parse_audio_with_gemini(audio_bytes, mime_type)
+    if res and res.get("records"):
+        res["source"] = "voice_ai"
+        return res
+    return {"is_relevant": False, "records": [], "source": "voice_ai_empty"}
 
 def fallback_regex_parser(text: str) -> Dict[str, Any]:
     """Zaxira tahlilchi (Regex)"""

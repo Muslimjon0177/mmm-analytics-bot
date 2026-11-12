@@ -18,6 +18,9 @@ from database import (
     get_customer_detail,
     save_record,
     get_all_records_for_export,
+    get_all_settings,
+    set_setting,
+    is_module_enabled,
     health_check as db_health_check
 )
 from excel_export import create_excel_report
@@ -281,6 +284,24 @@ def api_customer_details():
     except Exception as e:
         logger.error(f"Mijoz tafsilotlarini olishda xatolik ({name}): {e}")
         return jsonify({"error": str(e)}), 500
+
+@app.route("/api/settings", methods=["GET", "POST"])
+def api_settings():
+    """Modullar va sozlamalar (Feature Toggles)"""
+    if not is_admin_request(request):
+        return jsonify({"settings": get_all_settings(), "is_admin": False})
+
+    if request.method == "POST":
+        payload = request.get_json() or {}
+        for k, v in payload.items():
+            if isinstance(v, bool):
+                v_str = "true" if v else "false"
+            else:
+                v_str = str(v)
+            set_setting(k, v_str)
+        return jsonify({"success": True, "settings": get_all_settings()})
+
+    return jsonify({"settings": get_all_settings(), "is_admin": True})
 
 @app.route("/api/rate")
 def api_rate():

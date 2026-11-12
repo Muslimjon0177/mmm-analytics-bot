@@ -33,10 +33,11 @@ from database import (
     customer_exists,
     recalculate_customer_balance,
     recalculate_day_summary,
+    is_module_enabled,
     get_now,
     TASHKENT_TZ
 )
-from ai_parser import analyze_message
+from ai_parser import analyze_message, analyze_audio_message
 from excel_export import create_excel_report
 from webapp import run_server, set_bot_instance
 from currency import get_usd_rate
@@ -422,6 +423,42 @@ def handle_group_message(message):
                       message.chat.id, message.message_id, text, sender_name, date_str, time_str, reasons)
     except Exception as e:
         logger.error(f"Guruh xabarini tahlil qilishda xatolik: {e}")
+
+@bot.message_handler(func=lambda m: m.chat.type in ['group', 'supergroup'], content_types=['voice', 'audio'])
+def handle_group_voice_message(message):
+    if not group_allowed(message):
+        return
+    # Agar ovozli modul o'chirilgan bo'lsa, o'tkazib yuboramiz
+    if not is_module_enabled("voice"):
+        return
+
+    sender_name = message.from_user.full_name if message.from_user else "Noma'lum"
+
+    try:
+        if get_records_by_message(message.chat.id, message.message_id):
+            return
+
+        file_id = message.voice.file_id if message.voice else message.audio.file_id
+        file_info = bot.get_file(file_id)
+        audio_bytes = bot.download_file(file_info.file_path)
+        mime_type = "audio/ogg" if message.voice else (message.audio.mime_type or "audio/ogg")
+
+        result = analyze_audio_message(audio_bytes, mime_type)
+        if not result.get("is_relevant") or not result.get("records"):
+            return
+
+        date_str, time_str = msg_datetime(message.date)
+        reasons = review_reasons(result)
+        reasons.insert(0, "🎙 Ovozli xabar (Audio AI)")
+
+        voice_text = "🎙 [Guruhga yuborilgan ovozli xabar]"
+        save_parsed_records(result, voice_text, sender_name, message.chat.id, message.message_id, date_str, time_str)
+        logger.info(f"Guruhdan ovozli xabar tahlil qilindi ({sender_name}): {len(result['records'])} ta yozuv saqlandi.")
+
+        notify_admins("🎙 <b>Guruhdan yangi ovozli xabar qabul qilindi:</b>",
+                      message.chat.id, message.message_id, voice_text, sender_name, date_str, time_str, reasons)
+    except Exception as e:
+        logger.error(f"Guruhdagi ovozli xabarni tahlil qilishda xatolik: {e}")
 
 # ----------------- GURUHDA TAHRIRLANGAN XABARLAR (EDITED MESSAGES) -----------------
 

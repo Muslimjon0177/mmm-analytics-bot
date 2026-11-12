@@ -621,7 +621,10 @@
       <button onclick="exportExcel()" class="btn-excel">
         <span>📥 Excel</span>
       </button>
-      <button onclick="refreshData()" class="btn-refresh">
+      <button onclick="openSettingsModal()" class="btn-refresh" title="Modullar & Sozlamalar">
+        <span style="font-size:13px;">⚙️</span>
+      </button>
+      <button onclick="refreshData()" class="btn-refresh" title="Yangilash">
         <svg id="refresh-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
       </button>
     </div>
@@ -1239,6 +1242,108 @@
       else window.open(url, "_blank");
     }
 
+    function sendDebtReminder() {
+      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      const name = document.getElementById('cust-modal-name')?.innerText || 'Mijoz';
+      const balText = document.getElementById('cust-modal-status')?.innerText || '';
+      const credit = document.getElementById('cust-modal-credit')?.innerText || '0 so\'m';
+      const paid = document.getElementById('cust-modal-paid')?.innerText || '0 so\'m';
+
+      const text = `Assalomu alaykum, hurmatli ${name}!\n\n` +
+        `📊 Savdo va hisob-kitoblar holati bo'yicha ma'lumot:\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📑 Jami olingan tovarlar: ${credit}\n` +
+        `💰 To'langan summa: ${paid}\n` +
+        `📌 ${balText}\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `To'lovni plastik karta yoki naqd qabul qilamiz.\n` +
+        `Hisob-kitob bo'yicha savollaringiz bo'lsa, bemalol bog'lanishingiz mumkin. Rahmat!`;
+
+      const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(text)}`;
+      if (tg?.openTelegramLink) {
+        tg.openTelegramLink(shareUrl);
+      } else {
+        window.open(shareUrl, '_blank');
+      }
+    }
+
+    let globalSettings = {};
+
+    const MODULE_DEFS = [
+      { key: 'module_voice', title: '🎙 Ovozli Xabarlar (Audio AI)', desc: 'Guruhga tashlangan audio/golosovoyni avtomatik eshitib bazaga kiritish' },
+      { key: 'module_nasiya', title: '📑 Nasiya Daftari (CRM)', desc: 'Mijozlar balansi, qarzlar tarixi va eng yirik qarzdorlar hisoboti' },
+      { key: 'module_returns', title: '↩️ Tovar Qaytarish (Vozvrat)', desc: 'Qaytarilgan tovarlarni avtomatik hisoblab, qarzdan ayirish' },
+      { key: 'module_kelim', title: '📦 Ombor Kirimi (Kelim)', desc: 'Fura va tovar kirimlarini alohida ombor hisobiga olish' },
+      { key: 'module_usd', title: '💲 Valyuta (Dollar Kursi)', desc: 'Markaziy Bank kursini avtomatik ulab, dollar hisobini yuritish' },
+      { key: 'module_backup', title: '📦 Har Kecha Avto-Backup', desc: 'Har kuni soat 23:00 da Telegramga to\'liq Excel zaxirasini yuborish' }
+    ];
+
+    function openSettingsModal() {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+      if (!isAdmin) {
+        alert("🔒 Modullar sozlamasi faqat tizim egasi (admin) uchun ochiq.");
+        return;
+      }
+      document.getElementById('settings-modal')?.classList.add('active');
+      loadSettings();
+    }
+
+    function closeSettingsModal(e) {
+      if (!e || e.target.id === 'settings-modal' || e.target.classList.contains('modal-close-btn')) {
+        document.getElementById('settings-modal')?.classList.remove('active');
+      }
+    }
+
+    async function loadSettings() {
+      const container = document.getElementById('settings-modules-list');
+      if (!container) return;
+      try {
+        const res = await apiFetch('/api/settings');
+        const data = await res.json();
+        globalSettings = data.settings || {};
+        renderSettingsUI();
+      } catch (e) {
+        container.innerHTML = '<div style="color:#FF3366; font-size:11px; text-align:center;">Yuklashda xatolik</div>';
+      }
+    }
+
+    function renderSettingsUI() {
+      const container = document.getElementById('settings-modules-list');
+      if (!container) return;
+      container.innerHTML = '';
+      MODULE_DEFS.forEach(m => {
+        const isEnabled = String(globalSettings[m.key] || 'true') === 'true';
+        container.innerHTML += `
+          <div class="glass-card" style="padding:10px 12px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="flex:1; padding-right:10px;">
+              <div style="font-size:12px; font-weight:800; color:#FFF;">${m.title}</div>
+              <div style="font-size:9px; color:#64748B; margin-top:2px;">${m.desc}</div>
+            </div>
+            <button onclick="toggleSetting('${m.key}')" style="padding:6px 12px; border-radius:20px; font-size:10px; font-weight:800; cursor:pointer; border:1px solid; transition:all 0.2s; ${isEnabled ? 'background:rgba(0,245,160,0.15); color:#00F5A0; border-color:#00F5A0;' : 'background:rgba(255,255,255,0.05); color:#64748B; border-color:rgba(255,255,255,0.1);'}">
+              ${isEnabled ? '🟢 Yoqilgan' : '⚪ O\'chiq'}
+            </button>
+          </div>
+        `;
+      });
+    }
+
+    async function toggleSetting(key) {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      const current = String(globalSettings[key] || 'true') === 'true';
+      const newVal = !current;
+      globalSettings[key] = String(newVal);
+      renderSettingsUI();
+      try {
+        await apiFetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [key]: newVal })
+        });
+      } catch (e) {
+        console.error("Sozlamani saqlashda xatolik:", e);
+      }
+    }
+
     function closeCustomerModal(e) {
       if (!e || e.target.id === 'customer-modal' || e.target.classList.contains('modal-close-btn')) {
         document.getElementById('customer-modal')?.classList.remove('active');
@@ -1624,9 +1729,38 @@
           <span id="cust-modal-count" style="font-size:10px; color:#64748B;">0 ta yozuv</span>
         </div>
 
+        <!-- TEZ VA PROFESSIONAL QARZ ESLATMASI TUGMASI -->
+        <div style="margin-bottom:12px;">
+          <button onclick="sendDebtReminder()" style="width:100%; padding:10px 12px; border-radius:12px; background:linear-gradient(135deg, #FF3366, #A855F7); border:none; color:#FFF; font-weight:800; font-size:11px; display:flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; box-shadow:0 0 15px rgba(255,51,102,0.3);">
+            <span>📤 Mijozga Qarz Chekini (Eslatma) Yuborish</span>
+          </button>
+        </div>
+
         <!-- TARIX RO'YXATI -->
         <div id="cust-modal-records" style="display:flex; flex-direction:column; gap:8px; max-height:45vh; overflow-y:auto; padding-right:2px;">
           <div style="font-size:11px; color:#64748B; text-align:center; padding:15px;">Yuklanmoqda...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL (MODULLAR VA SOZLAMALAR) -->
+  <div id="settings-modal" class="modal-backdrop" onclick="closeSettingsModal(event)">
+    <div class="modal-dialog glass-card glow-cyan" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:22px;">⚙️</span>
+          <div>
+            <div style="font-size:14px; font-weight:900; color:#FFF;">Modullar & Sozlamalar</div>
+            <div style="font-size:10px; color:#94A3B8;">Kerakli funksiyalarni yoqing yoki o'chiring</div>
+          </div>
+        </div>
+        <button onclick="closeSettingsModal()" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div id="settings-modules-list" style="display:flex; flex-direction:column; gap:10px;">
+          <div style="text-align:center; color:#00F2FE; font-size:11px; padding:20px;">Yuklanmoqda...</div>
         </div>
       </div>
     </div>

@@ -233,6 +233,13 @@ def init_db():
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """,
+            """
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
             "CREATE INDEX IF NOT EXISTS idx_category ON records(category);",
             "CREATE INDEX IF NOT EXISTS idx_date ON records(date_str);",
             "CREATE INDEX IF NOT EXISTS idx_partner ON records(partner_name);",
@@ -283,6 +290,64 @@ def init_db():
         raise
     finally:
         client.close()
+
+# ----------------- SOZLAMALAR VA MODULLAR (FEATURE TOGGLES) -----------------
+
+DEFAULT_SETTINGS = {
+    "module_nasiya": "true",
+    "module_voice": "true",
+    "module_usd": "true",
+    "module_kelim": "true",
+    "module_backup": "true",
+    "module_returns": "true",
+    "auto_debt_reminder": "true"
+}
+
+def get_setting(key: str, default: Optional[str] = None) -> str:
+    """Sozlamani bazadan olish"""
+    client = get_client()
+    try:
+        res = client.execute("SELECT value FROM settings WHERE key = ? LIMIT 1", [key])
+        if res.rows:
+            return str(res.rows[0][0])
+        return default if default is not None else DEFAULT_SETTINGS.get(key, "false")
+    except Exception as e:
+        logger.warning(f"get_setting xatolik ({key}): {e}")
+        return default if default is not None else DEFAULT_SETTINGS.get(key, "false")
+    finally:
+        client.close()
+
+def set_setting(key: str, value: str):
+    """Sozlamani bazada yangilash"""
+    client = get_client()
+    try:
+        client.execute("""
+            INSERT INTO settings (key, value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+        """, [key, str(value)])
+    finally:
+        client.close()
+
+def get_all_settings() -> Dict[str, str]:
+    """Barcha yoqilgan/o'chirilgan modullar holati"""
+    out = dict(DEFAULT_SETTINGS)
+    client = get_client()
+    try:
+        res = client.execute("SELECT key, value FROM settings")
+        for row in res.rows:
+            out[row[0]] = str(row[1])
+        return out
+    except Exception as e:
+        logger.warning(f"get_all_settings xatolik: {e}")
+        return out
+    finally:
+        client.close()
+
+def is_module_enabled(module_name: str) -> bool:
+    """Modul yoqilganligini tekshirish (true/false)"""
+    val = get_setting(f"module_{module_name}", DEFAULT_SETTINGS.get(f"module_{module_name}", "true"))
+    return str(val).strip().lower() in ("true", "1", "yes", "on")
 
 def update_customer_ledger(partner_name: str, category: str, amount: float):
     """Mijozlar balansi va qarz daftarini yangilash"""
