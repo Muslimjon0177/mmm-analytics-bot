@@ -104,6 +104,9 @@ def get_main_menu() -> InlineKeyboardMarkup:
         InlineKeyboardButton("🔄 1 kunlik hisobotni yangilash", callback_data="refresh_today"),
         InlineKeyboardButton("📥 Excel yuklab olish (.xlsx)", callback_data="export_excel")
     )
+    markup.add(
+        InlineKeyboardButton("🎧 Texnik Yordam (Support)", callback_data="open_support")
+    )
     return markup
 
 def get_guest_menu() -> InlineKeyboardMarkup:
@@ -564,6 +567,23 @@ def cmd_refresh(message):
     )
     bot.send_message(message.chat.id, summary_text, reply_markup=get_main_menu())
 
+@bot.message_handler(commands=['support', 'yordam', 'help'], func=lambda m: m.chat.type == 'private')
+def cmd_support(message):
+    support_text = (
+        "🎧 <b>MMM Analytics Qo'llab-quvvatlash Xizmati (Support)</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "Savollaringiz, takliflaringiz yoki texnik yordam kerak bo'lsa:\n\n"
+        "👤 <b>Aloqa:</b> @fbr_a\n"
+        "⚡ <b>Tezkor yordam:</b> 24/7 online\n"
+        "💼 <b>Yangi guruhga ulash:</b> 777 000 so'm / oyiga\n\n"
+        "Quyidagi havola orqali to'g'ridan-to'g'ri bog'lanishingiz mumkin:"
+    )
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("💬 @fbr_a ga yozish", url="https://t.me/fbr_a"))
+    if is_admin(message.from_user.id):
+        markup.add(InlineKeyboardButton("⬅️ Asosiy menyu", callback_data="back_to_main"))
+    bot.send_message(message.chat.id, support_text, reply_markup=markup)
+
 # ----------------- CALLBACK TUGMALAR -----------------
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -618,6 +638,21 @@ def handle_callbacks(call):
     elif call.data == "export_excel":
         bot.answer_callback_query(call.id, "Excel tayyorlanmoqda...")
         send_excel_report(chat_id)
+    elif call.data == "open_support":
+        support_text = (
+            "🎧 <b>MMM Analytics Qo'llab-quvvatlash Xizmati (Support)</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Savollaringiz, takliflaringiz yoki texnik yordam kerak bo'lsa:\n\n"
+            "👤 <b>Aloqa:</b> @fbr_a\n"
+            "⚡ <b>Tezkor yordam:</b> 24/7 online\n"
+            "💼 <b>Yangi guruhga ulash:</b> 777 000 so'm / oyiga\n\n"
+            "Quyidagi havola orqali to'g'ridan-to'g'ri bog'lanishingiz mumkin:"
+        )
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("💬 @fbr_a ga yozish", url="https://t.me/fbr_a"))
+        markup.add(InlineKeyboardButton("⬅️ Ortga", callback_data="back_to_main"))
+        safe_edit_message_text(support_text, chat_id, message_id, reply_markup=markup)
+        bot.answer_callback_query(call.id)
 
 # ----------------- MAIN RUNNER -----------------
 

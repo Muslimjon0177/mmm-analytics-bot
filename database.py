@@ -684,25 +684,69 @@ def get_records_by_category(category: str, limit: int = 50) -> List[Dict[str, An
     """Toifaga ko'ra yozuvlar"""
     return get_filtered_records(category=category, limit=limit)
 
-def get_all_customers(search: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
-    """Mijozlar bazasi ro'yxati"""
+def get_all_customers(search: Optional[str] = None, limit: int = 100, order_by: str = "alphabetical") -> List[Dict[str, Any]]:
+    """Mijozlar bazasi ro'yxati (Alifbo yoki Qarz bo'yicha saralash)"""
     client = get_client()
     try:
+        order_clause = "ORDER BY LOWER(display_name) ASC" if order_by == "alphabetical" else "ORDER BY current_balance DESC"
         if search and search.strip():
             s = f"%{search.strip().lower()}%"
-            res = client.execute("""
+            query = f"""
                 SELECT * FROM customers 
                 WHERE LOWER(display_name) LIKE ? OR LOWER(name) LIKE ?
-                ORDER BY current_balance DESC
+                {order_clause}
                 LIMIT ?
-            """, [s, s, limit])
+            """
+            res = client.execute(query, [s, s, limit])
         else:
-            res = client.execute("""
+            query = f"""
                 SELECT * FROM customers 
-                ORDER BY current_balance DESC
+                {order_clause}
                 LIMIT ?
-            """, [limit])
+            """
+            res = client.execute(query, [limit])
         return rows_to_dicts(res)
+    finally:
+        client.close()
+
+def get_customer_detail(partner_name: str) -> Optional[Dict[str, Any]]:
+    """Mijozning to'liq profili va unga tegishli barcha savdo/pul berdi yozuvlari tarixi"""
+    if not partner_name:
+        return None
+    clean_display = normalize_partner_name(partner_name)
+    clean_key = clean_display.lower()
+    client = get_client()
+    try:
+        # 1. Mijozning umumiy ma'lumoti
+        c_res = client.execute(
+            "SELECT * FROM customers WHERE name = ? OR LOWER(display_name) = ? LIMIT 1",
+            [clean_key, clean_key]
+        )
+        c_list = rows_to_dicts(c_res)
+        if c_list:
+            customer_data = c_list[0]
+        else:
+            customer_data = {
+                "name": clean_key,
+                "display_name": clean_display,
+                "total_credit": 0.0,
+                "total_paid": 0.0,
+                "current_balance": 0.0
+            }
+
+        # 2. Ushbu mijozga tegishli barcha yozuvlar (Telegram sanasi va vaqti bilan)
+        r_res = client.execute("""
+            SELECT * FROM records 
+            WHERE LOWER(partner_name) = ? OR LOWER(partner_name) LIKE ?
+            ORDER BY date_str DESC, time_str DESC, id DESC
+        """, [clean_key, f"%{clean_key}%"])
+        records = rows_to_dicts(r_res)
+
+        return {
+            "customer": customer_data,
+            "records": records,
+            "total_records": len(records)
+        }
     finally:
         client.close()
 

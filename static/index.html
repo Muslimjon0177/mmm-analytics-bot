@@ -424,6 +424,162 @@
       height: 20px;
     }
 
+    /* Floating Support Pill */
+    .support-floating-btn {
+      position: fixed;
+      bottom: 78px;
+      right: 14px;
+      z-index: 95;
+      background: rgba(11, 17, 30, 0.92);
+      border: 1px solid rgba(0, 242, 254, 0.45);
+      backdrop-filter: blur(14px);
+      padding: 7px 13px;
+      border-radius: 30px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0, 242, 254, 0.35);
+      color: #00F2FE;
+      font-size: 11px;
+      font-weight: 800;
+      transition: transform 0.15s, box-shadow 0.2s;
+    }
+    .support-floating-btn:active {
+      transform: scale(0.95);
+    }
+    .support-pulse {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #00F5A0;
+      box-shadow: 0 0 8px #00F5A0;
+      animation: pulseAnim 1.8s infinite;
+    }
+
+    /* Modals & Drawers */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 9, 15, 0.82);
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      animation: fadeIn 0.18s ease-out;
+    }
+    .modal-backdrop.active {
+      display: flex;
+    }
+    .modal-dialog {
+      width: 100%;
+      max-width: 440px;
+      max-height: 86vh;
+      display: flex;
+      flex-direction: column;
+      padding: 18px;
+      overflow-y: auto;
+      border-radius: 20px;
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 12px;
+    }
+    .modal-close-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #FFF;
+      font-size: 18px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .faq-item {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: #CBD5E1;
+      line-height: 1.5;
+    }
+    .faq-item b {
+      color: #00F5A0;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    /* Category filter pills (Savdolar) */
+    .category-pills {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 12px;
+      scrollbar-width: none;
+    }
+    .category-pills::-webkit-scrollbar {
+      display: none;
+    }
+    .cat-pill {
+      background: rgba(11, 17, 30, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #94A3B8;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 7px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .cat-pill.active {
+      background: linear-gradient(135deg, #00F2FE, #2563EB);
+      color: #FFF;
+      border-color: transparent;
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.4);
+    }
+
+    /* Sort chips for Customers */
+    .sort-chip {
+      background: rgba(11, 17, 30, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #94A3B8;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 5px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .sort-chip.active {
+      background: rgba(0, 242, 254, 0.2);
+      color: #00F2FE;
+      border-color: rgba(0, 242, 254, 0.4);
+    }
+
+    /* Customer clickable card */
+    .customer-card-item {
+      cursor: pointer;
+      transition: transform 0.15s, border-color 0.2s, background 0.2s;
+    }
+    .customer-card-item:active {
+      transform: scale(0.98);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
     /* Pulsing Neon Dot */
     .neon-pulse-dot {
       width: 8px;
@@ -505,11 +661,11 @@
         <button onclick="changePeriod('all')" id="period-all" class="period-btn">Barchasi</button>
       </div>
 
-      <!-- 4 TA NEON KPI KARTALARI -->
+      <!-- 4 TA NEON KPI KARTALARI (BOSILGANDA TEGISHLI BO'LIMGA O'TADI) -->
       <div class="kpi-grid">
         
         <!-- 💵 NAQD -->
-        <div class="glass-card glow-emerald kpi-card">
+        <div onclick="filterAndSwitch('naqd')" class="glass-card glow-emerald kpi-card" style="cursor:pointer;">
           <div class="kpi-head">
             <span class="kpi-label" style="color:#00F5A0;">
               <span style="width:6px; height:6px; border-radius:50%; background:#00F5A0;"></span> Naqd
@@ -517,11 +673,11 @@
             <span class="kpi-badge" id="kpi-naqd-count" style="background:rgba(0,245,160,0.15); color:#00F5A0; border:1px solid rgba(0,245,160,0.3);">— ta</span>
           </div>
           <div class="kpi-val" id="kpi-naqd-sum">— so'm</div>
-          <div class="kpi-sub">To'liq to'langan</div>
+          <div class="kpi-sub">To'liq to'langan →</div>
         </div>
 
         <!-- 📑 NASIYA -->
-        <div class="glass-card glow-rose kpi-card">
+        <div onclick="filterAndSwitch('nasiya')" class="glass-card glow-rose kpi-card" style="cursor:pointer;">
           <div class="kpi-head">
             <span class="kpi-label" style="color:#FF3366;">
               <span style="width:6px; height:6px; border-radius:50%; background:#FF3366;"></span> Nasiya
@@ -529,11 +685,11 @@
             <span class="kpi-badge" id="kpi-nasiya-count" style="background:rgba(255,51,102,0.15); color:#FF3366; border:1px solid rgba(255,51,102,0.3);">— ta</span>
           </div>
           <div class="kpi-val" id="kpi-nasiya-sum">— so'm</div>
-          <div class="kpi-sub">Qarzga berilgan</div>
+          <div class="kpi-sub">Qarzga berilgan →</div>
         </div>
 
         <!-- 💰 PUL KELDI -->
-        <div class="glass-card glow-cyan kpi-card">
+        <div onclick="filterAndSwitch('pul_keldi')" class="glass-card glow-cyan kpi-card" style="cursor:pointer;">
           <div class="kpi-head">
             <span class="kpi-label" style="color:#00F2FE;">
               <span style="width:6px; height:6px; border-radius:50%; background:#00F2FE;"></span> Pul Keldi
@@ -541,11 +697,11 @@
             <span class="kpi-badge" id="kpi-paid-count" style="background:rgba(0,242,254,0.15); color:#00F2FE; border:1px solid rgba(0,242,254,0.3);">— ta</span>
           </div>
           <div class="kpi-val" id="kpi-paid-sum">— so'm</div>
-          <div class="kpi-sub">Qarzdan to'langan</div>
+          <div class="kpi-sub">Qarzdan to'langan →</div>
         </div>
 
         <!-- 👥 MIJOZLAR QARZI -->
-        <div class="glass-card glow-amber kpi-card">
+        <div onclick="switchTab('customers')" class="glass-card glow-amber kpi-card" style="cursor:pointer;">
           <div class="kpi-head">
             <span class="kpi-label" style="color:#FFB800;">
               <span style="width:6px; height:6px; border-radius:50%; background:#FFB800;"></span> Qarzlar
@@ -553,7 +709,7 @@
             <span class="kpi-badge" style="background:rgba(255,184,0,0.15); color:#FFB800; border:1px solid rgba(255,184,0,0.3);">CRM</span>
           </div>
           <div class="kpi-val" id="kpi-debt-sum">— so'm</div>
-          <div class="kpi-sub">Hozirgi sof qoldiq</div>
+          <div class="kpi-sub">Hozirgi sof qoldiq →</div>
         </div>
 
       </div>
@@ -754,12 +910,22 @@
         <button onclick="buySubscription()" class="shimmer-btn">👑 O'z guruhingizga ulash — 777 000 so'm/oy</button>
       </div>
       <div id="admin-customers-content">
-        <input type="text" id="search-customers" oninput="debounceSearch('customers')" placeholder="Mijoz ismi yoki firmasini qidirish..." style="width:100%; background:#0B111E; border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:10px 14px; color:#FFF; font-size:12px; outline:none; margin-bottom:12px;">
-        <div id="customers-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+        <!-- Qidiruv va Alifbo Tartibi -->
+        <input type="text" id="search-customers" oninput="debounceSearch('customers')" placeholder="Mijoz ismi yoki firmasini qidirish..." style="width:100%; background:#0B111E; border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:10px 14px; color:#FFF; font-size:12px; outline:none; margin-bottom:10px;">
+        
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+          <span style="font-size:11px; font-weight:800; color:#94A3B8;">👥 Mijozlar ro'yxati (<span id="customers-count">0</span> ta)</span>
+          <div style="display:flex; gap:6px;">
+            <button onclick="setCustomerSort('alphabetical')" id="sort-alphabetical" class="sort-chip active">🔤 Alifbo (A-Z)</button>
+            <button onclick="setCustomerSort('debt')" id="sort-debt" class="sort-chip">🔴 Qarz bo'yicha</button>
+          </div>
+        </div>
+
+        <div id="customers-list" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
     </div>
 
-    <!-- ================= TAB 5: BARCHA SAVDOLAR ================= -->
+    <!-- ================= TAB 5: BARCHA SAVDOLAR (NAQD, PUL KELDI, NASIYA ALOHIDA) ================= -->
     <div id="tab-records" class="tab-pane">
       <div id="guest-records-locked" class="glass-card glow-cyan" style="display:none; text-align:center; padding:24px 16px; margin-bottom:14px;">
         <div style="font-size:36px; margin-bottom:8px;">🔒</div>
@@ -768,8 +934,17 @@
         <button onclick="buySubscription()" class="shimmer-btn">🚀 Litsenziya olish — 777 000 so'm/oy</button>
       </div>
       <div id="admin-records-content">
-        <input type="text" id="search-records" oninput="debounceSearch('records')" placeholder="Tovar yoki mijoz bo'yicha qidiruv..." style="width:100%; background:#0B111E; border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:10px 14px; color:#FFF; font-size:12px; outline:none; margin-bottom:12px;">
-        <div id="records-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+        <!-- Qidiruv va Toifalar segmenti (Naqd va Pul Keldi alohida) -->
+        <input type="text" id="search-records" oninput="debounceSearch('records')" placeholder="Tovar yoki mijoz bo'yicha qidiruv..." style="width:100%; background:#0B111E; border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:10px 14px; color:#FFF; font-size:12px; outline:none; margin-bottom:10px;">
+        
+        <div class="category-pills">
+          <button onclick="setRecordCategory('all')" id="cat-all" class="cat-pill active">Barchasi</button>
+          <button onclick="setRecordCategory('naqd')" id="cat-naqd" class="cat-pill">🟢 Naqd Savdo</button>
+          <button onclick="setRecordCategory('pul_keldi')" id="cat-pul_keldi" class="cat-pill">💰 Pul Keldi (To'lov)</button>
+          <button onclick="setRecordCategory('nasiya')" id="cat-nasiya" class="cat-pill">🔴 Nasiya Savdo</button>
+        </div>
+
+        <div id="records-list" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
     </div>
 
@@ -1016,6 +1191,139 @@
       });
     }
 
+    let currentSortOrder = 'alphabetical';
+    let currentRecordCategory = 'all';
+
+    function setCustomerSort(order) {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      currentSortOrder = order;
+      document.getElementById('sort-alphabetical')?.classList.toggle('active', order === 'alphabetical');
+      document.getElementById('sort-debt')?.classList.toggle('active', order === 'debt');
+      loadCustomers();
+    }
+
+    function setRecordCategory(cat) {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      currentRecordCategory = cat;
+      document.querySelectorAll('.cat-pill').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`cat-${cat}`)?.classList.add('active');
+      loadRecords();
+    }
+
+    function filterAndSwitch(cat) {
+      switchTab('records');
+      setRecordCategory(cat);
+    }
+
+    function openSupportModal() {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+      document.getElementById('support-modal')?.classList.add('active');
+    }
+
+    function closeSupportModal(e) {
+      if (!e || e.target.id === 'support-modal' || e.target.classList.contains('modal-close-btn')) {
+        document.getElementById('support-modal')?.classList.remove('active');
+      }
+    }
+
+    function openSupportChat(e) {
+      if (e) e.preventDefault();
+      const url = "https://t.me/fbr_a";
+      if (tg?.openTelegramLink) tg.openTelegramLink(url);
+      else window.open(url, "_blank");
+    }
+
+    function closeCustomerModal(e) {
+      if (!e || e.target.id === 'customer-modal' || e.target.classList.contains('modal-close-btn')) {
+        document.getElementById('customer-modal')?.classList.remove('active');
+      }
+    }
+
+    function renderCustomerModalData(data, name) {
+      if (!data) return;
+      const cust = data.customer || {};
+      const records = data.records || [];
+
+      document.getElementById('cust-modal-name').innerText = cust.display_name || name;
+      const bal = cust.current_balance || 0;
+      const balEl = document.getElementById('cust-modal-status');
+      if (bal > 0) {
+        balEl.innerText = `🔴 Qoldiq qarz: ${formatNumber(bal)} so'm`;
+        balEl.style.color = '#FF3366';
+      } else {
+        balEl.innerText = '🟢 Hisob yopiq (Qarz yo\'q)';
+        balEl.style.color = '#00F5A0';
+      }
+
+      document.getElementById('cust-modal-credit').innerText = formatNumber(cust.total_credit || 0) + ' so\'m';
+      document.getElementById('cust-modal-paid').innerText = formatNumber(cust.total_paid || 0) + ' so\'m';
+      document.getElementById('cust-modal-count').innerText = `${records.length} ta yozuv`;
+
+      const listContainer = document.getElementById('cust-modal-records');
+      if (records.length === 0) {
+        listContainer.innerHTML = '<div style="font-size:11px; color:#64748B; text-align:center; padding:15px;">Ushbu mijozga oid operatsiyalar topilmadi.</div>';
+        return;
+      }
+
+      listContainer.innerHTML = '';
+      records.forEach(r => {
+        let bColor = '#00F2FE';
+        let bBg = 'rgba(0, 242, 254, 0.15)';
+        let bText = 'Pul berdi';
+
+        if (r.category === 'naqd') {
+          bColor = '#00F5A0'; bBg = 'rgba(0, 245, 160, 0.15)'; bText = 'Naqd';
+        } else if (r.category === 'nasiya') {
+          bColor = '#FF3366'; bBg = 'rgba(255, 51, 102, 0.15)'; bText = 'Nasiya';
+        }
+
+        const itemDesc = r.item_name ? `${r.quantity || ''} ${r.unit || ''} ${r.item_name}`.trim() : (bText);
+        const timeBadge = r.time_str ? ` • ${r.time_str}` : '';
+
+        listContainer.innerHTML += `
+          <div class="glass-card" style="padding:10px 12px; background:rgba(255,255,255,0.02); border-color:rgba(255,255,255,0.06);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+              <span style="font-size:9px; font-weight:900; color:${bColor}; background:${bBg}; padding:2px 8px; border-radius:10px;">${bText}</span>
+              <span style="font-size:12px; font-weight:900; color:#FFF;">${formatNumber(r.total_amount)} so'm</span>
+            </div>
+            <div style="font-size:11px; font-weight:700; color:#E2E8F0;">${itemDesc}</div>
+            <div style="font-size:9px; color:#64748B; margin-top:2px; display:flex; justify-content:space-between;">
+              <span>📅 ${r.date_str}${timeBadge}</span>
+              ${r.price ? `<span>Narx: ${formatNumber(r.price)}</span>` : ''}
+            </div>
+            ${r.raw_message ? `<div style="font-size:9px; color:#475569; font-style:italic; margin-top:4px; border-top:1px dashed rgba(255,255,255,0.04); padding-top:2px;">"${r.raw_message}"</div>` : ''}
+          </div>
+        `;
+      });
+    }
+
+    async function openCustomerDetail(partnerName) {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+      const modal = document.getElementById('customer-modal');
+      modal.classList.add('active');
+
+      document.getElementById('cust-modal-name').innerText = partnerName;
+      document.getElementById('cust-modal-records').innerHTML = '<div style="font-size:11px; color:#00F2FE; text-align:center; padding:20px;">Yuklanmoqda...</div>';
+
+      // 1. Keshdan bir zumda ochish (0.001s instant display)
+      const cacheKey = 'mmm_cust_' + partnerName.toLowerCase();
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) renderCustomerModalData(JSON.parse(cached), partnerName);
+      } catch (e) {}
+
+      // 2. Serverdan yangilab olish
+      try {
+        const adminQ = isAdmin ? `&uid=${currentUserId}` : '';
+        const res = await fetch(`/api/customer-details?name=${encodeURIComponent(partnerName)}${adminQ}`);
+        const data = await res.json();
+        try { localStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) {}
+        renderCustomerModalData(data, partnerName);
+      } catch (err) {
+        console.error('Mijoz tafsilotlari xatoligi:', err);
+      }
+    }
+
     async function loadCustomers() {
       if (!isAdmin) {
         document.getElementById('guest-customers-locked').style.display = 'block';
@@ -1029,10 +1337,13 @@
       container.innerHTML = '<div style="text-align:center; color:#00F2FE; font-size:11px; padding:20px;">Yuklanmoqda...</div>';
 
       try {
-        const adminQ = `&uid=${currentUserId}`;
+        const adminQ = `&uid=${currentUserId}&order=${currentSortOrder}`;
         const res = await fetch(`/api/customers?search=${encodeURIComponent(search)}${adminQ}`);
         const data = await res.json();
         const customers = data.customers || [];
+
+        const countBadge = document.getElementById('customers-count');
+        if (countBadge) countBadge.innerText = customers.length;
 
         container.innerHTML = '';
         if (customers.length === 0) {
@@ -1042,15 +1353,23 @@
 
         customers.forEach((c, idx) => {
           const isDebtor = (c.current_balance || 0) > 0;
+          const safeName = (c.display_name || c.name || '').replace(/'/g, "\\'");
           container.innerHTML += `
-            <div class="glass-card" style="padding:12px 14px; border-color:${isDebtor ? 'rgba(255,51,102,0.3)' : 'rgba(0,245,160,0.2)'}">
+            <div onclick="openCustomerDetail('${safeName}')" class="glass-card customer-card-item" style="padding:12px 14px; border-color:${isDebtor ? 'rgba(255,51,102,0.3)' : 'rgba(0,245,160,0.2)'}">
               <div style="display:flex; align-items:center; justify-content:space-between;">
                 <div>
-                  <div style="font-size:12px; font-weight:900; color:#FFF;">${idx+1}. ${c.display_name}</div>
-                  <div style="font-size:9px; color:#64748B;">So'nggi: ${c.last_updated ? c.last_updated.substring(0, 10) : '-'}</div>
+                  <div style="font-size:12px; font-weight:900; color:#FFF; display:flex; align-items:center; gap:6px;">
+                    <span style="color:#64748B; font-size:10px;">${idx+1}.</span> ${c.display_name}
+                  </div>
+                  <div style="font-size:9px; color:#64748B; margin-top:2px;">
+                    Nasiya: ${formatNumber(c.total_credit || 0)} • To'lov: ${formatNumber(c.total_paid || 0)}
+                  </div>
                 </div>
-                <div style="font-size:10px; font-weight:900; padding:2px 8px; border-radius:12px; ${isDebtor ? 'color:#FF3366; background:rgba(255,51,102,0.15);' : 'color:#00F5A0; background:rgba(0,245,160,0.15);'}">
-                  ${isDebtor ? 'Qarz: ' + formatNumber(c.current_balance) : 'Yopiq'}
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div style="font-size:10px; font-weight:900; padding:3px 8px; border-radius:12px; ${isDebtor ? 'color:#FF3366; background:rgba(255,51,102,0.15);' : 'color:#00F5A0; background:rgba(0,245,160,0.15);'}">
+                    ${isDebtor ? 'Qarz: ' + formatNumber(c.current_balance) : 'Yopiq'}
+                  </div>
+                  <span style="font-size:12px; color:#64748B;">→</span>
                 </div>
               </div>
             </div>
@@ -1074,23 +1393,39 @@
       container.innerHTML = '<div style="text-align:center; color:#00F2FE; font-size:11px; padding:20px;">Yuklanmoqda...</div>';
 
       try {
-        const adminQ = `&uid=${currentUserId}`;
+        const catQ = currentRecordCategory !== 'all' ? `&category=${currentRecordCategory}` : '';
+        const adminQ = `&uid=${currentUserId}${catQ}`;
         const res = await fetch(`/api/records?search=${encodeURIComponent(search)}${adminQ}`);
         const data = await res.json();
         const records = data.records || [];
 
         container.innerHTML = '';
         if (records.length === 0) {
-          container.innerHTML = '<div style="text-align:center; color:#64748B; font-size:11px; padding:20px;">Yozuvlar topilmadi</div>';
+          container.innerHTML = '<div style="text-align:center; color:#64748B; font-size:11px; padding:20px;">Ushbu toifada yozuvlar topilmadi</div>';
           return;
         }
 
-        records.slice(0, 40).forEach(r => {
+        records.slice(0, 50).forEach(r => {
+          let bColor = '#00F2FE';
+          let bBg = 'rgba(0, 242, 254, 0.15)';
+          let bText = 'To\'lov';
+
+          if (r.category === 'naqd') {
+            bColor = '#00F5A0'; bBg = 'rgba(0, 245, 160, 0.15)'; bText = 'Naqd';
+          } else if (r.category === 'nasiya') {
+            bColor = '#FF3366'; bBg = 'rgba(255, 51, 102, 0.15)'; bText = 'Nasiya';
+          }
+
           const timeBadge = r.time_str ? ` • ${r.time_str}` : '';
+          const title = r.partner_name ? `${r.partner_name}: ${r.item_name || 'Savdo'}` : (r.item_name || 'Tovar');
+
           container.innerHTML += `
             <div class="glass-card" style="padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
               <div>
-                <div style="font-size:12px; font-weight:800; color:#FFF;">${r.item_name || 'Savdo'} ${r.partner_name ? '(' + r.partner_name + ')' : ''}</div>
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+                  <span style="font-size:9px; font-weight:900; color:${bColor}; background:${bBg}; padding:1px 6px; border-radius:8px;">${bText}</span>
+                  <div style="font-size:12px; font-weight:800; color:#FFF;">${title}</div>
+                </div>
                 <div style="font-size:9px; color:#64748B;">${r.date_str}${timeBadge} • ${r.quantity || ''} ${r.unit || ''}</div>
               </div>
               <div style="font-size:12px; font-weight:900; color:#00F5A0;">${formatNumber(r.total_amount)} so'm</div>
@@ -1169,5 +1504,100 @@
       initApp();
     });
   </script>
+
+  <!-- FLOATING SUPPORT BUTTON (BURCHAKDA IXCHAM) -->
+  <button onclick="openSupportModal()" class="support-floating-btn" title="Tezkor Yordam & Support">
+    <span style="font-size:13px;">🎧</span>
+    <span>Yordam</span>
+    <span class="support-pulse"></span>
+  </button>
+
+  <!-- SUPPORT MODAL (IXCHAM YORDAM OYNASI) -->
+  <div id="support-modal" class="modal-backdrop" onclick="closeSupportModal(event)">
+    <div class="modal-dialog glass-card glow-cyan" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:22px;">🎧</span>
+          <div>
+            <div style="font-size:14px; font-weight:900; color:#FFF;">Tezkor Yordam & Support</div>
+            <div style="font-size:10px; color:#94A3B8;">Savollar va texnik yordam uchun</div>
+          </div>
+        </div>
+        <button onclick="closeSupportModal()" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding-top:6px;">
+        <a href="https://t.me/fbr_a" target="_blank" onclick="openSupportChat(event)" class="shimmer-btn" style="text-decoration:none; margin-bottom:14px; font-size:12px; padding:12px;">
+          <span>💬 Muallif bilan bog'lanish (@fbr_a)</span>
+        </a>
+
+        <div style="font-size:11px; font-weight:800; color:#00F2FE; margin-bottom:8px; text-transform:uppercase;">
+          💡 Tezkor Qo'llanma:
+        </div>
+
+        <div class="faq-item">
+          <b>📝 Guruhda xabar yozish namunasi:</b>
+          • <i>"Ilyos aka 93ta olmanok 168dan nasiya"</i> (Nasiya savdo)<br>
+          • <i>"25ta olmanok 170dan naqd"</i> (Naqd savdo)<br>
+          • <i>"Adham aka Farg'ona 2,000,000 berdi"</i> (Qarz to'landi)
+        </div>
+
+        <div class="faq-item">
+          <b>✏️ Xabarni tahrirlash (Edit):</b>
+          Guruhdagi xabarni tahrirlasangiz, bot eski hisobotni o'chirib, darhol yangi qiymatlarni qayta hisoblaydi.
+        </div>
+
+        <div class="faq-item">
+          <b>💵 Dollar hisob-kitobi ($):</b>
+          Mijoz dollarda to'lasa (masalan <i>"100$ berdi"</i>), bot rasmiy MB kursi bo'yicha so'mga aylantiradi.
+        </div>
+
+        <div class="faq-item">
+          <b>👑 Yangi guruhga ulash:</b>
+          Oylik litsenziya: <b>777 000 so'm/oy</b> (24/7 bulutli server xarajatlari narx ichida).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOMER DETAIL MODAL (MIJOZNING BARCHA SAVDO VA PUL BERDILARI OYNASI) -->
+  <div id="customer-modal" class="modal-backdrop" onclick="closeCustomerModal(event)">
+    <div class="modal-dialog glass-card glow-purple" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:22px;">👤</span>
+          <div>
+            <div id="cust-modal-name" style="font-size:14px; font-weight:900; color:#FFF;">Mijoz ismi</div>
+            <div id="cust-modal-status" style="font-size:10px; font-weight:800; color:#FF3366;">Qarz: — so'm</div>
+          </div>
+        </div>
+        <button onclick="closeCustomerModal()" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- 2 TA MINI KPI: NASIYA, PUL BERDI -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+          <div class="glass-card" style="padding:10px; background:rgba(255,51,102,0.08); border-color:rgba(255,51,102,0.25);">
+            <div style="font-size:9px; font-weight:800; color:#FF3366; text-transform:uppercase;">📑 Jami Nasiya</div>
+            <div id="cust-modal-credit" style="font-size:13px; font-weight:900; color:#FFF; margin-top:2px;">— so'm</div>
+          </div>
+          <div class="glass-card" style="padding:10px; background:rgba(0,242,254,0.08); border-color:rgba(0,242,254,0.25);">
+            <div style="font-size:9px; font-weight:800; color:#00F2FE; text-transform:uppercase;">💰 Jami To'lagan</div>
+            <div id="cust-modal-paid" style="font-size:13px; font-weight:900; color:#FFF; margin-top:2px;">— so'm</div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <span style="font-size:11px; font-weight:800; color:#94A3B8; text-transform:uppercase;">📜 Savdolar & To'lovlar Tarixi</span>
+          <span id="cust-modal-count" style="font-size:10px; color:#64748B;">0 ta yozuv</span>
+        </div>
+
+        <!-- TARIX RO'YXATI -->
+        <div id="cust-modal-records" style="display:flex; flex-direction:column; gap:8px; max-height:45vh; overflow-y:auto; padding-right:2px;">
+          <div style="font-size:11px; color:#64748B; text-align:center; padding:15px;">Yuklanmoqda...</div>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

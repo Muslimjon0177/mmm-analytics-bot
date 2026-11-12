@@ -9,6 +9,7 @@ from database import (
     get_advanced_stats,
     get_filtered_records,
     get_all_customers,
+    get_customer_detail,
     save_record,
     get_all_records_for_export,
     health_check as db_health_check
@@ -150,7 +151,7 @@ def api_records():
 
 @app.route("/api/customers")
 def api_customers():
-    """Mijozlar bazasi (CRM): Faqat admin uchun haqiqiy, begonalarga demo"""
+    """Mijozlar bazasi (CRM): Alifbo yoki Qarz bo'yicha saralangan"""
     if not is_admin_request(request):
         return jsonify({
             "is_demo": True,
@@ -162,14 +163,71 @@ def api_customers():
         })
 
     search = request.args.get("search", "").strip()
-    limit = int(request.args.get("limit", 100))
+    limit = int(request.args.get("limit", 150))
+    order = request.args.get("order", "alphabetical").strip().lower()
 
     try:
-        customers = get_all_customers(search=search if search else None, limit=limit)
+        customers = get_all_customers(search=search if search else None, limit=limit, order_by=order)
         return jsonify({"customers": customers, "is_admin": True})
     except Exception as e:
         logger.error(f"Mijozlarni olishda xatolik: {e}")
         return jsonify({"error": str(e), "customers": []}), 500
+
+@app.route("/api/customer-details")
+def api_customer_details():
+    """Mijozning to'liq kartochkasi va unga tegishli savdo/to'lovlar tarixi"""
+    name = request.args.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "Mijoz ismi talab qilinadi"}), 400
+
+    if not is_admin_request(request):
+        # Mehmonlar uchun namunaviy demo kartochka
+        return jsonify({
+            "is_demo": True,
+            "customer": {
+                "name": "namuna",
+                "display_name": name,
+                "total_credit": 3500000,
+                "total_paid": 2000000,
+                "current_balance": 1500000
+            },
+            "records": [
+                {
+                    "category": "nasiya",
+                    "item_name": "Olma (Namuna)",
+                    "quantity": 10,
+                    "unit": "yashik",
+                    "price": 170000,
+                    "total_amount": 1700000,
+                    "date_str": "Bugun",
+                    "time_str": "11:20:15",
+                    "raw_message": f"{name} 10ta olma 170dan nasiya"
+                },
+                {
+                    "category": "pul_keldi",
+                    "item_name": None,
+                    "quantity": None,
+                    "unit": None,
+                    "price": None,
+                    "total_amount": 2000000,
+                    "date_str": "Kechagi kun",
+                    "time_str": "16:45:00",
+                    "raw_message": f"{name} 2 mln pul berdi"
+                }
+            ],
+            "total_records": 2,
+            "message": "Haqiqiy mijoz daftari faqat tizim egasi uchun maxfiy saqlanadi."
+        })
+
+    try:
+        detail = get_customer_detail(name)
+        if not detail:
+            return jsonify({"error": "Mijoz topilmadi"}), 404
+        detail["is_admin"] = True
+        return jsonify(detail)
+    except Exception as e:
+        logger.error(f"Mijoz tafsilotlarini olishda xatolik ({name}): {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/rate")
 def api_rate():
