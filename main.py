@@ -2,6 +2,7 @@ import io
 import os
 import sys
 import time
+import html
 import urllib.request
 import logging
 import threading
@@ -25,6 +26,7 @@ from database import (
     save_record,
     get_daily_summary,
     get_records_by_category,
+    get_filtered_records,
     get_all_customers,
     get_all_records_for_export,
     delete_records_by_message,
@@ -688,6 +690,58 @@ def cmd_sheets(message):
             f"Namuna: <code>/sheets https://docs.google.com/spreadsheets/d/...</code>\n"
             f"<i>Eslatma: Google Sheets faylida \"Havola orqali hamma ko'ra oladi\" (Anyone with the link can view) yoqilgan bo'lishi kerak.</i>"
         )
+
+@bot.message_handler(commands=['holat', 'status'], func=lambda m: m.chat.type == 'private')
+def cmd_holat(message):
+    if not check_admin_or_reply(message): return
+    wh_lines = []
+    try:
+        wh = bot.get_webhook_info()
+        wh_url = html.escape(wh.url or "O'rnatilmagan")
+        wh_err = html.escape(wh.last_error_message or "Yo'q")
+        wh_lines = [
+            f"• <b>Webhook URL:</b> <code>{wh_url}</code>",
+            f"• <b>Navbatdagi xabarlar (pending):</b> <b>{wh.pending_update_count} ta</b>",
+            f"• <b>Oxirgi webhook xatosi:</b> <code>{wh_err}</code>"
+        ]
+    except Exception as e:
+        wh_lines = [f"• <b>Webhook tekshirish xatosi:</b> <code>{html.escape(str(e))}</code>"]
+
+    allowed_str = ", ".join(str(x) for x in ALLOWED_GROUP_IDS) if ALLOWED_GROUP_IDS else "Hamma guruhlar ochiq (cheklov yo'q)"
+    recent = get_filtered_records(limit=3)
+    rec_lines = []
+    for r in recent:
+        raw_preview = html.escape((r.get("raw_message") or r.get("item_name") or "")[:35])
+        rec_lines.append(
+            f"• <code>{r.get('date_str')} {r.get('time_str')}</code> | chat:<code>{r.get('chat_id')}</code> | {r.get('category')} — {raw_preview}"
+        )
+    if not rec_lines:
+        rec_lines = ["• <i>Bazaga hali yozuv tushmagan</i>"]
+
+    text = (
+        "🩺 <b>BOT VA GURUH DIAGNOSTIKASI (/holat)</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"• <b>Rejim (BOT_MODE):</b> <code>{html.escape(str(BOT_MODE))}</code>\n"
+        f"• <b>WebApp URL:</b> <code>{html.escape(str(CURRENT_WEB_APP_URL or ''))}</code>\n"
+        f"• <b>Ruxsat etilgan guruhlar (ALLOWED_GROUP_IDS):</b> <code>{html.escape(allowed_str)}</code>\n"
+        + "\n".join(wh_lines) +
+        "\n━━━━━━━━━━━━━━━━━━━━\n"
+        "📥 <b>Bazaga tushgan oxirgi 3 ta yozuv:</b>\n"
+        + "\n".join(rec_lines) +
+        "\n━━━━━━━━━━━━━━━━━━━━\n"
+        "💡 <i>Guruhingiz ID raqamini bilish uchun o'sha guruhga <code>/id</code> deb yozing.</i>"
+    )
+    bot.send_message(message.chat.id, text, reply_markup=get_main_menu())
+
+@bot.message_handler(commands=['id'])
+def cmd_chat_id(message):
+    if not message.from_user or not is_admin(message.from_user.id):
+        return
+    bot.reply_to(
+        message,
+        f"🆔 <b>Chat ID:</b> <code>{message.chat.id}</code>\n"
+        f"📌 <b>Turi:</b> <code>{message.chat.type}</code>"
+    )
 
 @bot.message_handler(commands=['support', 'yordam', 'help'], func=lambda m: m.chat.type == 'private')
 def cmd_support(message):
