@@ -12,15 +12,16 @@ logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """
 Sen savdo va ombor tizimlaridagi xabarlarni tahlil qiluvchi o'ta aniq AI tahlilchisan.
-Guruhdagi xabarlardan quyidagi 4 toifani ajratib, JSON formatida qaytarishing kerak:
+Guruhdagi xabarlardan quyidagi 7 toifani ajratib, JSON formatida qaytarishing kerak:
 
 1. "naqd" - Naqd savdo:
-   - Qoida: Agar tovar sotilgani yozilgan bo'lsa, lekin MIJOZ / ODAM ISMI YO'Q bo'lsa (masalan: "2ta olmanok 170 dan", "10 qop un 320 dan") -> bu "naqd" savdo!
+   - Qoida: Agar tovar sotilgani yozilgan bo'lsa, lekin MIJOZ / ODAM ISMI YO'Q bo'lsa (masalan: "2ta olmanok 170 dan", "10 qop un 320 dan", "naqd 200$", "200 dollar naqd savdo") -> bu "naqd" savdo!
+   - Agar naqd savdo dollarda bo'lsa ($ yoki "dollar"): currency: "USD", amount_usd: 200 deb ajrating!
    - partner_name: null bo'ladi.
 
 2. "nasiya" - Nasiya (qarzga) savdo:
-   - Qoida: Agar MIJOZ / ODAM / DO'KON ISMI YOZILIB tovar sotilgan bo'lsa (masalan: "Akmal aka 5 ta sement 65 dan", "Karvonga 50 ta profil 120 dan") -> bu "nasiya" savdo!
-   - partner_name: mijoz ismi ("Akmal aka", "Karvon" va h.k.).
+   - Qoida: Agar MIJOZ / ODAM / DO'KON ISMI YOZILIB tovar sotilgan bo'lsa (masalan: "Akmal aka 5 ta sement 65 dan", "Suxrob Denov 10 ta olma 170 dan") -> bu "nasiya" savdo!
+   - partner_name: mijoz ismi ("Akmal aka", "Suxrob Denov" va h.k.).
 
 3. "pul_keldi" - Kassaga pul to'lash (qarz yopish):
    - Qoida: Agar ism yozilib pul berildi, pul keldi, qarz to'landi deb yozilsa (masalan: "Akmal aka 500000 berdi", "Jamshiddan (100$) pul keldi", "Olim aka 50$ berdi") -> bu "pul_keldi" toifasi!
@@ -34,8 +35,17 @@ Guruhdagi xabarlardan quyidagi 4 toifani ajratib, JSON formatida qaytarishing ke
    - Qoida: "qaytardi", "qaytib keldi", "vozvrat", "qaytarildi" so'zlari bo'lsa (masalan: "Ali aka 2 yashik olmani qaytardi 170 dan").
    - partner_name: mijoz ismi (bo'lmasa null). Bu mijozning qarzini kamaytiradi.
 
+6. "rasxod" - Kunlik xarajat / chiqim:
+   - Qoida: "rasxod", "rasxot", "xarajat", "chiqim", "abed", "yo'l kira", "benzin", "tushlik", "oylik" kabi do'kon/ombor xarajatlari (masalan: "rasxot 150 ming", "abedga rasxod 80", "rasxot 50$").
+   - item_name: xarajat sababi (masalan: "abed", "yo'l kira", "rasxot"). partner_name: null.
+   - Kassadagi naqd puldan ayriladi!
+
+7. "uyga" - Uyga ketyapti / Inkassatsiya (egasi olib ketayotgan pul):
+   - Qoida: "uyga", "uyga ketyapti", "uyga ketdi", "uyga olib ketildi", "kassadan olindi" kabi yozuvlar (masalan: "uyga ketyapti 5 mln", "uyga 1000$", "uyga 3 500 000").
+   - Kassadagi sof naqd pul bilan solishtirish uchun alohida hisoblanadi!
+
 MUHIM QOIDALAR:
-- Narxlarni o'qishda: Agar narx "170, 175, 180, 65, 320" kabi 1000 dan kichik sonlarda yozilgan bo'lsa, ularning orqasiga 3 ta nol qo'shib yoz (masalan: 170 -> 170000, 65 -> 65000)!
+- Narxlarni o'qishda: Agar valyuta UZS (so'm) bo'lsa va narx "170, 175, 180, 65, 320" kabi 1000 dan kichik sonlarda yozilgan bo'lsa, ularning orqasiga 3 ta nol qo'shib yoz (masalan: 170 -> 170000, 65 -> 65000)! Agar USD ($) bo'lsa 3 ta nol QO'SHMA (masalan: 50$ -> amount_usd: 50)!
 - Umumiy summa (total_amount) = quantity * price (agar ikkalasi mavjud bo'lsa).
 - "1.5 mln", "1,5 million" -> 1500000; "500 ming" -> 500000.
 - Agar summa yoki ism aniq tushunarsiz bo'lsa, o'zingdan to'qima: noma'lum maydonni null qoldir.
@@ -46,7 +56,7 @@ Javobing FAQAT va FAQAT to'g'ri JSON formatida bo'lsin:
   "is_relevant": true,
   "records": [
     {
-      "category": "naqd" | "nasiya" | "pul_keldi" | "kelim" | "qaytarish",
+      "category": "naqd" | "nasiya" | "pul_keldi" | "kelim" | "qaytarish" | "rasxod" | "uyga",
       "item_name": "olmanok",
       "quantity": 2,
       "unit": "ta",
@@ -181,6 +191,58 @@ def fallback_regex_parser(text: str) -> Dict[str, Any]:
             "partner_name": partner, "currency": "UZS", "amount_usd": None
         }]}
 
+    # 0.1. Uyga ketyapti (Inkassatsiya)
+    if any(k in lower for k in ["uyga ketyapti", "uyga ketdi", "uyga olib", "uyga"]):
+        m = re.search(r'(\d+[\d\s.,]*)\s*(mln|million|ming|\$|dollar|usd)?', lower)
+        is_usd = "$" in text or "dollar" in lower or "usd" in lower
+        amt = float(m.group(1).replace(" ", "").replace(",", ".")) if m else 0
+        unit_kw = (m.group(2) or "") if m else ""
+        if not is_usd:
+            if unit_kw in ("mln", "million"):
+                amt *= 1_000_000
+            elif unit_kw == "ming" or (0 < amt < 1000):
+                amt *= 1000
+        return {"is_relevant": amt > 0, "records": [{
+            "category": "uyga", "item_name": "Uyga ketyapti", "quantity": None, "unit": None,
+            "price": None, "total_amount": None if is_usd else amt, "partner_name": None,
+            "currency": "USD" if is_usd else "UZS", "amount_usd": amt if is_usd else None
+        }]}
+
+    # 0.2. Rasxod (Xarajat / Chiqim)
+    if any(k in lower for k in ["rasxod", "rasxot", "xarajat", "chiqim"]):
+        m = re.search(r'(\d+[\d\s.,]*)\s*(mln|million|ming|\$|dollar|usd)?', lower)
+        is_usd = "$" in text or "dollar" in lower or "usd" in lower
+        amt = float(m.group(1).replace(" ", "").replace(",", ".")) if m else 0
+        unit_kw = (m.group(2) or "") if m else ""
+        if not is_usd:
+            if unit_kw in ("mln", "million"):
+                amt *= 1_000_000
+            elif unit_kw == "ming" or (0 < amt < 1000):
+                amt *= 1000
+        return {"is_relevant": amt > 0, "records": [{
+            "category": "rasxod", "item_name": text[:40].strip(), "quantity": None, "unit": None,
+            "price": None, "total_amount": None if is_usd else amt, "partner_name": None,
+            "currency": "USD" if is_usd else "UZS", "amount_usd": amt if is_usd else None
+        }]}
+
+    # 0.3. Naqd savdo (USD yoki UZS)
+    if any(k in lower for k in ["naqd", "naxt"]) and not any(k in lower for k in ["nasiya", "qarzga"]):
+        m = re.search(r'(\d+[\d\s.,]*)\s*(mln|million|ming|\$|dollar|usd)?', lower)
+        is_usd = "$" in text or "dollar" in lower or "usd" in lower
+        amt = float(m.group(1).replace(" ", "").replace(",", ".")) if m else 0
+        unit_kw = (m.group(2) or "") if m else ""
+        if not is_usd:
+            if unit_kw in ("mln", "million"):
+                amt *= 1_000_000
+            elif unit_kw == "ming" or (0 < amt < 1000):
+                amt *= 1000
+        if amt > 0:
+            return {"is_relevant": True, "records": [{
+                "category": "naqd", "item_name": text[:40].strip(), "quantity": None, "unit": None,
+                "price": None, "total_amount": None if is_usd else amt, "partner_name": None,
+                "currency": "USD" if is_usd else "UZS", "amount_usd": amt if is_usd else None
+            }]}
+
     # 1. Pul keldi / Pul berildi tekshiruvi
     if any(k in lower for k in ["pul keldi", "pul berdi", "berdi", "to'ladi", "toladi", "yopdi", "oplata"]):
         usd_match = re.search(r'\(?\$?\s*(\d+[\d\s.,]*)\s*(\$|dollar|usd|\b)\)?', lower)
@@ -273,7 +335,7 @@ def fallback_regex_parser(text: str) -> Dict[str, Any]:
 
     return {"is_relevant": len(records) > 0, "records": records}
 
-VALID_CATEGORIES = ("naqd", "nasiya", "pul_keldi", "kelim", "qaytarish")
+VALID_CATEGORIES = ("naqd", "nasiya", "pul_keldi", "kelim", "qaytarish", "rasxod", "uyga")
 
 def _to_number(v) -> Optional[float]:
     if v is None or v == "":
@@ -296,13 +358,21 @@ def _sanitize_ai_result(res: Dict[str, Any]) -> Dict[str, Any]:
         r["category"] = cat
         for k in ("quantity", "price", "total_amount", "amount_usd"):
             r[k] = _to_number(r.get(k))
-        pr = r.get("price")
-        if pr is not None and 0 < pr < 1000:
-            r["price"] = pr * 1000
-        if r.get("quantity") and r.get("price"):
-            r["total_amount"] = round(r["quantity"] * r["price"], 2)
         if r.get("currency") not in ("UZS", "USD"):
             r["currency"] = "USD" if r.get("amount_usd") else "UZS"
+        is_usd = (r["currency"] == "USD")
+        pr = r.get("price")
+        if not is_usd and pr is not None and 0 < pr < 1000:
+            r["price"] = pr * 1000
+        if is_usd:
+            if not r.get("amount_usd") and r.get("quantity") and r.get("price"):
+                r["amount_usd"] = round(r["quantity"] * r["price"], 2)
+            elif not r.get("amount_usd") and r.get("total_amount") and r["total_amount"] < 100000:
+                r["amount_usd"] = r["total_amount"]
+                r["total_amount"] = None
+        else:
+            if r.get("quantity") and r.get("price"):
+                r["total_amount"] = round(r["quantity"] * r["price"], 2)
         if isinstance(r.get("partner_name"), str):
             r["partner_name"] = r["partner_name"].strip() or None
         clean.append(r)

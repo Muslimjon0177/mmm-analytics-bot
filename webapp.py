@@ -194,7 +194,7 @@ def api_records():
     limit = int(request.args.get("limit", 100))
 
     try:
-        valid_cats = ("kelim", "naqd", "nasiya", "pul_keldi", "ostatka")
+        valid_cats = ("kelim", "naqd", "nasiya", "pul_keldi", "qaytarish", "rasxod", "uyga", "ostatka")
         records = get_filtered_records(
             category=category if category in valid_cats else None,
             search=search if search else None,
@@ -302,6 +302,22 @@ def api_settings():
         return jsonify({"success": True, "settings": get_all_settings()})
 
     return jsonify({"settings": get_all_settings(), "is_admin": True})
+
+@app.route("/api/import-sheets", methods=["POST"])
+def api_import_sheets():
+    """Google Sheets dan mijozlar bazasini import/sinxron qilish (faqat admin)"""
+    if not is_admin_request(request):
+        return jsonify({"error": "Ruxsat etilmagan"}), 403
+    payload = request.get_json() or {}
+    url = (payload.get("url") or "").strip() or None
+    try:
+        from sheets_sync import fetch_and_import_google_sheet
+        res = fetch_and_import_google_sheet(url)
+        status = 200 if res.get("success") else 400
+        return jsonify(res), status
+    except Exception as e:
+        logger.error(f"Google Sheets import xatoligi: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/api/rate")
 def api_rate():

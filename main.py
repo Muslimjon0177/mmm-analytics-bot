@@ -31,6 +31,10 @@ from database import (
     get_records_by_message,
     get_message_datetime,
     customer_exists,
+    get_all_customer_names,
+    get_customer_by_id,
+    get_customer_id_by_name,
+    reassign_message_partner,
     recalculate_customer_balance,
     recalculate_day_summary,
     is_module_enabled,
@@ -38,6 +42,8 @@ from database import (
     TASHKENT_TZ
 )
 from ai_parser import analyze_message, analyze_audio_message
+from customer_matcher import resolve_customer_name
+from sheets_sync import fetch_and_import_google_sheet
 from excel_export import create_excel_report
 from webapp import run_server, set_bot_instance
 from currency import get_usd_rate
@@ -148,13 +154,19 @@ def generate_today_summary_text(target_date: Optional[str] = None) -> str:
     naqd = data["naqd"]
     nasiya = data["nasiya"]
     pul = data["pul_keldi"]
+    rasxod = data.get("rasxod", {"count": 0, "total_sum": 0, "total_usd": 0})
+    uyga = data.get("uyga", {"count": 0, "total_sum": 0, "total_usd": 0})
+    rec = data.get("reconciliation", {})
     debts = data.get("total_customer_debts", 0)
     total_cust = data.get("total_customers_count", 0)
     debtors_cnt = data.get("debtors_count", 0)
     top_debtors = data.get("top_debtors", [])
     latest_active = data.get("latest_active_summary")
 
-    has_today_sales = (naqd['count'] > 0 or nasiya['count'] > 0 or pul['count'] > 0)
+    has_today_sales = (
+        naqd['count'] > 0 or nasiya['count'] > 0 or pul['count'] > 0
+        or rasxod['count'] > 0 or uyga['count'] > 0
+    )
 
     lines = [
         f"📊 <b>KUNLIK HISOBOT ({target_date})</b>",
@@ -164,17 +176,37 @@ def generate_today_summary_text(target_date: Optional[str] = None) -> str:
     ]
 
     if has_today_sales:
+        naqd_usd_line = f" (<b>${format_number(naqd.get('total_usd', 0))}</b>)" if naqd.get('total_usd') else ""
+        pul_usd_line = f" (<b>${format_number(pul.get('total_usd', 0))}</b>)" if pul.get('total_usd') else ""
         lines.extend([
             f"💵 <b>NAQD SAVDO:</b>",
             f"• Sotuvlar soni: <b>{naqd['count']} ta</b>",
-            f"• Jami summa: <b>{format_number(naqd['total_sum'])} so'm</b>\n",
+            f"• Jami summa: <b>{format_number(naqd['total_sum'])} so'm</b>{naqd_usd_line}\n",
             f"📑 <b>NASIYA SAVDO (Qarzga):</b>",
             f"• Nasiyalar soni: <b>{nasiya['count']} ta</b>",
             f"• Jami summa: <b>{format_number(nasiya['total_sum'])} so'm</b>\n",
             f"💰 <b>KASSAGA PUL KELDI (To'lovlar):</b>",
             f"• To'lovlar soni: <b>{pul['count']} ta</b>",
-            f"• Jami tushum: <b>{format_number(pul['total_sum'])} so'm</b>"
+            f"• Jami tushum: <b>{format_number(pul['total_sum'])} so'm</b>{pul_usd_line}"
         ])
+        if rasxod["count"] > 0 or uyga["count"] > 0 or rec:
+            diff_uzs = rec.get("diff_uzs", 0)
+            diff_label = "✅ To'g'ri" if diff_uzs == 0 else (f"➕ Ortiqcha: +{format_number(diff_uzs)}" if diff_uzs > 0 else f"❗️ Kamomad: {format_number(diff_uzs)}")
+            lines.extend([
+                "",
+                f"⚖️ <b>KASSA MANTIQI ({target_date}):</b>",
+                f"• Kechagi qoldiq qo'shildi: <b>{format_number(rec.get('yesterday_net_uzs', 0))} so'm</b>",
+                f"• Bugungi naqd + pul keldi: <b>{format_number(rec.get('today_in_uzs', 0))} so'm</b>",
+                f"• 💸 Rasxodlar ayrildi: <b>-{format_number(rec.get('today_rasxod_uzs', 0))} so'm</b>",
+                f"• 💼 Kassada bo'lishi kerak: <b>{format_number(rec.get('expected_uzs', 0))} so'm</b>",
+                f"• 🏠 Uyga ketyapti: <b>{format_number(rec.get('today_uyga_uzs', 0))} so'm</b>",
+                f"• 📊 Farq: <b>{diff_label} so'm</b>"
+            ])
+            if rec.get("expected_usd") or rec.get("today_uyga_usd") or rec.get("today_in_usd"):
+                diff_usd = rec.get("diff_usd", 0)
+                lines.append(
+                    f"• 💵 Dollar kassa: <b>${format_number(rec.get('expected_usd', 0))}</b> | Uyga: <b>${format_number(rec.get('today_uyga_usd', 0))}</b> | Farq: <b>${format_number(diff_usd)}</b>"
+                )
     else:
         lines.append(f"🕒 <i>Bugun ({target_date}) guruhda hali yangi savdo xabari yozilmadi.</i>")
         if latest_active:
@@ -281,6 +313,8 @@ CATEGORY_BADGES = {
     "pul_keldi": "💰 Pul Keldi",
     "kelim": "📦 Kelim",
     "qaytarish": "↩️ Qaytarish",
+    "rasxod": "💸 Rasxod",
+    "uyga": "🏠 Uyga ketyapti",
 }
 
 # Tekshiruv talab qiladigan chegaralar
@@ -313,16 +347,36 @@ def review_reasons(result: dict) -> list:
     # takrorlarni olib tashlash
     return list(dict.fromkeys(reasons))
 
-def save_parsed_records(result: dict, text: str, sender_name: str, chat_id: int, message_id: int, date_str: str, time_str: str):
+def save_parsed_records(result: dict, text: str, sender_name: str, chat_id: int, message_id: int, date_str: str, time_str: str) -> list:
+    """Yozuvlarni bazaga saqlaydi (mijoz ismini aqlli/transliteratsiya orqali bog'laydi).
+    Agar bir nechta o'xshash mijoz topilib ikkilansa, nomzod ismlar ro'yxatini qaytaradi."""
+    existing_customers = get_all_customer_names()
+    ambiguous_candidates = []
+
     for rec in result["records"]:
+        cat = rec.get("category", "naqd")
+        raw_partner = rec.get("partner_name")
+        resolved_partner = raw_partner
+
+        if raw_partner and cat in ("nasiya", "pul_keldi", "qaytarish"):
+            match = resolve_customer_name(raw_partner, existing_customers)
+            resolved_partner = match["resolved"]
+            rec["partner_name"] = resolved_partner
+            if match.get("ambiguous") and match.get("candidates"):
+                for cand in match["candidates"]:
+                    if cand not in ambiguous_candidates:
+                        ambiguous_candidates.append(cand)
+            elif match.get("matched_existing") and resolved_partner not in existing_customers:
+                existing_customers.append(resolved_partner)
+
         save_record(
-            category=rec.get("category", "naqd"),
+            category=cat,
             item_name=rec.get("item_name"),
             quantity=rec.get("quantity"),
             unit=rec.get("unit"),
             price=rec.get("price"),
             total_amount=rec.get("total_amount"),
-            partner_name=rec.get("partner_name"),
+            partner_name=resolved_partner,
             currency=rec.get("currency", "UZS"),
             amount_usd=rec.get("amount_usd"),
             raw_message=text,
@@ -332,6 +386,7 @@ def save_parsed_records(result: dict, text: str, sender_name: str, chat_id: int,
             date_str=date_str,
             time_str=time_str
         )
+    return ambiguous_candidates
 
 def format_saved_lines(chat_id: int, message_id: int) -> list:
     """Bazaga AYNAN qanday saqlanganini ko'rsatadi (AI javobini emas)"""
@@ -346,8 +401,18 @@ def format_saved_lines(chat_id: int, message_id: int) -> list:
         lines.append(f"{badge}: {p_str}{item_str}{tot_str}{usd_extra}")
     return lines
 
-def review_keyboard(chat_id: int, message_id: int) -> InlineKeyboardMarkup:
+def review_keyboard(chat_id: int, message_id: int, ambiguous_candidates: list = None) -> InlineKeyboardMarkup:
     kb = InlineKeyboardMarkup(row_width=3)
+    if ambiguous_candidates:
+        pick_btns = []
+        for cand in ambiguous_candidates[:4]:
+            cid = get_customer_id_by_name(cand)
+            if cid:
+                pick_btns.append(
+                    InlineKeyboardButton(f"👤 {cand[:22]}", callback_data=f"pick_cust:{chat_id}:{message_id}:{cid}")
+                )
+        for btn in pick_btns:
+            kb.add(btn)
     kb.add(
         InlineKeyboardButton("✅ To'g'ri", callback_data=f"rv_ok:{chat_id}:{message_id}"),
         InlineKeyboardButton("✏️ Tuzatish", callback_data=f"rv_fix:{chat_id}:{message_id}"),
@@ -356,13 +421,15 @@ def review_keyboard(chat_id: int, message_id: int) -> InlineKeyboardMarkup:
     return kb
 
 def notify_admins(header: str, chat_id: int, message_id: int, text: str, sender_name: str,
-                  date_str: str, time_str: str, reasons: list):
+                  date_str: str, time_str: str, reasons: list, ambiguous_candidates: list = None):
     if not ADMIN_IDS:
         return
     lines = format_saved_lines(chat_id, message_id)
     warn = ""
     if reasons:
         warn = "⚠️ <b>Tekshiring:</b> " + "; ".join(reasons) + "\n"
+    if ambiguous_candidates:
+        warn += "🔀 <b>Qaysi mijozga tegishli?</b> Quyidagi tugmalardan birini bosing:\n"
     body = (
         f"{header}\n"
         f"🕒 <i>Telegram vaqti: {time_str} ({date_str})</i>\n"
@@ -373,7 +440,7 @@ def notify_admins(header: str, chat_id: int, message_id: int, text: str, sender_
         f"✍️ <i>Yozuvchi: {sender_name}</i>\n"
         f"💬 <i>Xabar: \"{text}\"</i>"
     )
-    kb = review_keyboard(chat_id, message_id) if lines else None
+    kb = review_keyboard(chat_id, message_id, ambiguous_candidates) if lines else None
     for admin_id in ADMIN_IDS:
         try:
             bot.send_message(admin_id, body, reply_markup=kb)
@@ -416,11 +483,11 @@ def handle_group_message(message):
 
         date_str, time_str = msg_datetime(message.date)
         reasons = review_reasons(result)  # saqlashdan OLDIN (yangi mijozni aniqlash uchun)
-        save_parsed_records(result, text, sender_name, message.chat.id, message.message_id, date_str, time_str)
+        ambiguous = save_parsed_records(result, text, sender_name, message.chat.id, message.message_id, date_str, time_str)
         logger.info(f"Guruhdan {len(result['records'])} ta yozuv saqlandi ({sender_name}, {date_str} {time_str}).")
 
         notify_admins("📥 <b>Guruhdan yangi ma'lumot qabul qilindi:</b>",
-                      message.chat.id, message.message_id, text, sender_name, date_str, time_str, reasons)
+                      message.chat.id, message.message_id, text, sender_name, date_str, time_str, reasons, ambiguous)
     except Exception as e:
         logger.error(f"Guruh xabarini tahlil qilishda xatolik: {e}")
 
@@ -452,11 +519,11 @@ def handle_group_voice_message(message):
         reasons.insert(0, "🎙 Ovozli xabar (Audio AI)")
 
         voice_text = "🎙 [Guruhga yuborilgan ovozli xabar]"
-        save_parsed_records(result, voice_text, sender_name, message.chat.id, message.message_id, date_str, time_str)
+        ambiguous = save_parsed_records(result, voice_text, sender_name, message.chat.id, message.message_id, date_str, time_str)
         logger.info(f"Guruhdan ovozli xabar tahlil qilindi ({sender_name}): {len(result['records'])} ta yozuv saqlandi.")
 
         notify_admins("🎙 <b>Guruhdan yangi ovozli xabar qabul qilindi:</b>",
-                      message.chat.id, message.message_id, voice_text, sender_name, date_str, time_str, reasons)
+                      message.chat.id, message.message_id, voice_text, sender_name, date_str, time_str, reasons, ambiguous)
     except Exception as e:
         logger.error(f"Guruhdagi ovozli xabarni tahlil qilishda xatolik: {e}")
 
@@ -598,6 +665,30 @@ def cmd_refresh(message):
     )
     bot.send_message(message.chat.id, summary_text, reply_markup=get_main_menu())
 
+@bot.message_handler(commands=['sheets', 'sync_sheets'], func=lambda m: m.chat.type == 'private')
+def cmd_sheets(message):
+    if not check_admin_or_reply(message): return
+    parts = (message.text or "").split(maxsplit=1)
+    url = parts[1].strip() if len(parts) > 1 else None
+    bot.send_message(message.chat.id, "📥 Google Sheets mijozlar bazasi yuklanmoqda, kuting...")
+    res = fetch_and_import_google_sheet(url)
+    if res.get("success"):
+        bot.send_message(
+            message.chat.id,
+            f"✅ <b>Google Sheets mijozlar bazasi muvaffaqiyatli yuklandi!</b>\n"
+            f"• Yangi qo'shildi: <b>{res.get('imported', 0)} ta</b>\n"
+            f"• Yangilandi: <b>{res.get('updated', 0)} ta</b>\n"
+            f"• Jami qayta ishlandi: <b>{res.get('total', 0)} ta</b>",
+            reply_markup=get_main_menu()
+        )
+    else:
+        bot.send_message(
+            message.chat.id,
+            f"⚠️ <b>Google Sheets yuklashda xatolik:</b> {res.get('error', 'Noma’lum xato')}\n\n"
+            f"Namuna: <code>/sheets https://docs.google.com/spreadsheets/d/...</code>\n"
+            f"<i>Eslatma: Google Sheets faylida \"Havola orqali hamma ko'ra oladi\" (Anyone with the link can view) yoqilgan bo'lishi kerak.</i>"
+        )
+
 @bot.message_handler(commands=['support', 'yordam', 'help'], func=lambda m: m.chat.type == 'private')
 def cmd_support(message):
     support_text = (
@@ -681,6 +772,31 @@ def handle_callbacks(call):
             "Ushbu funksiya faqat admin uchun. Botni o'z guruhingizga ulash: @fbr_a (oyiga 777.000 so'm)",
             show_alert=True
         )
+        return
+
+    # --- Ikki xil o'xshash mijozdan birini tanlash ---
+    if call.data.startswith("pick_cust:"):
+        try:
+            _, g_chat, g_msg, cid = call.data.split(":")
+            g_chat, g_msg, cid = int(g_chat), int(g_msg), int(cid)
+        except ValueError:
+            bot.answer_callback_query(call.id, "Noto'g'ri tugma")
+            return
+        cust = get_customer_by_id(cid)
+        if not cust:
+            bot.answer_callback_query(call.id, "Mijoz topilmadi")
+            return
+        target_name = cust["display_name"]
+        affected = reassign_message_partner(g_chat, g_msg, target_name)
+        for p in affected:
+            recalculate_customer_balance(p)
+        try:
+            bot.edit_message_reply_markup(chat_id, message_id, reply_markup=review_keyboard(g_chat, g_msg))
+        except Exception:
+            pass
+        bot.send_message(chat_id, f"✅ Mijoz <b>{target_name}</b> ga biriktirildi va balans yangilandi.",
+                         reply_to_message_id=message_id)
+        bot.answer_callback_query(call.id, f"Tanlandi: {target_name}")
         return
 
     # --- Yozuvni tasdiqlash / tuzatish / bekor qilish ---

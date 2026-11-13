@@ -659,6 +659,7 @@
       <!-- DAVR FILTRI -->
       <div class="period-filter">
         <button onclick="changePeriod('today')" id="period-today" class="period-btn">Bugun</button>
+        <button onclick="changePeriod('yesterday')" id="period-yesterday" class="period-btn">Kechagi</button>
         <button onclick="changePeriod('7days')" id="period-7days" class="period-btn active">7 Kun</button>
         <button onclick="changePeriod('month')" id="period-month" class="period-btn">Bu oy</button>
         <button onclick="changePeriod('all')" id="period-all" class="period-btn">Barchasi</button>
@@ -676,6 +677,7 @@
             <span class="kpi-badge" id="kpi-naqd-count" style="background:rgba(0,245,160,0.15); color:#00F5A0; border:1px solid rgba(0,245,160,0.3);">— ta</span>
           </div>
           <div class="kpi-val" id="kpi-naqd-sum">— so'm</div>
+          <div class="kpi-sub" id="kpi-naqd-usd" style="color:#00F5A0; font-weight:700; display:none;">💵 $0</div>
           <div class="kpi-sub">To'liq to'langan →</div>
         </div>
 
@@ -715,6 +717,41 @@
           <div class="kpi-sub">Hozirgi sof qoldiq →</div>
         </div>
 
+      </div>
+
+      <!-- KASSA VA UYGA KETYAPTI MANTIQI -->
+      <div class="glass-card" id="kassa-reconciliation-card" style="padding:14px; margin-bottom:14px; border:1px solid rgba(0,242,254,0.22);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <span style="font-size:12px; font-weight:800; color:#FFF;">⚖️ Kassa & Uyga Ketyapti</span>
+          <span id="rec-date-badge" style="font-size:10px; color:#00F2FE; background:rgba(0,242,254,0.12); padding:2px 8px; border-radius:999px;">—</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11px;">
+          <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:10px;">
+            <div style="color:#94A3B8; font-size:10px;">Kechagi qoldiq (+)</div>
+            <div id="rec-yesterday-uzs" style="font-weight:800; color:#E2E8F0; margin-top:2px;">0 so'm</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:10px;">
+            <div style="color:#94A3B8; font-size:10px;">Bugungi naqd + keldi (+)</div>
+            <div id="rec-today-in-uzs" style="font-weight:800; color:#00F5A0; margin-top:2px;">0 so'm</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:10px;">
+            <div style="color:#94A3B8; font-size:10px;">💸 Rasxodlar (-)</div>
+            <div id="rec-rasxod-uzs" style="font-weight:800; color:#FF3366; margin-top:2px;">0 so'm</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:10px;">
+            <div style="color:#94A3B8; font-size:10px;">💼 Kassada bo'lishi kerak</div>
+            <div id="rec-expected-uzs" style="font-weight:800; color:#00F2FE; margin-top:2px;">0 so'm</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:10px;">
+            <div style="color:#94A3B8; font-size:10px;">🏠 Uyga ketyapti</div>
+            <div id="rec-uyga-uzs" style="font-weight:800; color:#A855F7; margin-top:2px;">0 so'm</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); padding:8px; border-radius:10px;">
+            <div style="color:#94A3B8; font-size:10px;">📊 Farq</div>
+            <div id="rec-diff-uzs" style="font-weight:800; color:#FFB800; margin-top:2px;">0 so'm</div>
+          </div>
+        </div>
+        <div id="rec-usd-line" style="display:none; margin-top:8px; font-size:11px; color:#00F5A0; background:rgba(0,245,160,0.08); padding:6px 10px; border-radius:8px;"></div>
       </div>
 
       <!-- GRAFIK -->
@@ -945,6 +982,8 @@
           <button onclick="setRecordCategory('naqd')" id="cat-naqd" class="cat-pill">🟢 Naqd Savdo</button>
           <button onclick="setRecordCategory('pul_keldi')" id="cat-pul_keldi" class="cat-pill">💰 Pul Keldi (To'lov)</button>
           <button onclick="setRecordCategory('nasiya')" id="cat-nasiya" class="cat-pill">🔴 Nasiya Savdo</button>
+          <button onclick="setRecordCategory('rasxod')" id="cat-rasxod" class="cat-pill">💸 Rasxod</button>
+          <button onclick="setRecordCategory('uyga')" id="cat-uyga" class="cat-pill">🏠 Uyga</button>
         </div>
 
         <div id="records-list" style="display:flex; flex-direction:column; gap:8px;"></div>
@@ -1060,12 +1099,55 @@
       const elDebtSum = document.getElementById('kpi-debt-sum');
 
       if (elNaqdSum && kpi.total_naqd_sum !== undefined) elNaqdSum.innerText = formatNumber(kpi.total_naqd_sum) + ' so\'m';
+      const elNaqdUsd = document.getElementById('kpi-naqd-usd');
+      if (elNaqdUsd) {
+        if (kpi.total_naqd_usd && Number(kpi.total_naqd_usd) > 0) {
+          elNaqdUsd.style.display = 'block';
+          elNaqdUsd.innerText = `💵 $${formatNumber(kpi.total_naqd_usd)}`;
+        } else {
+          elNaqdUsd.style.display = 'none';
+        }
+      }
       if (elNaqdCount && kpi.count_naqd !== undefined) elNaqdCount.innerText = `${kpi.count_naqd} ta`;
       if (elNasiyaSum && kpi.total_nasiya_sum !== undefined) elNasiyaSum.innerText = formatNumber(kpi.total_nasiya_sum) + ' so\'m';
       if (elNasiyaCount && kpi.count_nasiya !== undefined) elNasiyaCount.innerText = `${kpi.count_nasiya} ta`;
       if (elPaidSum && kpi.total_paid_sum !== undefined) elPaidSum.innerText = formatNumber(kpi.total_paid_sum) + ' so\'m';
       if (elPaidCount && kpi.count_paid !== undefined) elPaidCount.innerText = `${kpi.count_paid} ta`;
       if (elDebtSum && kpi.total_debtors_balance !== undefined) elDebtSum.innerText = formatNumber(kpi.total_debtors_balance) + ' so\'m';
+
+      // Kassa & Uyga Ketyapti mantiqi
+      const rec = data.reconciliation || {};
+      const elRecDate = document.getElementById('rec-date-badge');
+      if (elRecDate && rec.date) elRecDate.innerText = rec.date;
+      const setTxt = (id, val) => { const e = document.getElementById(id); if (e) e.innerText = val; };
+      setTxt('rec-yesterday-uzs', `${formatNumber(rec.yesterday_net_uzs || 0)} so'm`);
+      setTxt('rec-today-in-uzs', `${formatNumber(rec.today_in_uzs || 0)} so'm`);
+      setTxt('rec-rasxod-uzs', `-${formatNumber(rec.today_rasxod_uzs || 0)} so'm`);
+      setTxt('rec-expected-uzs', `${formatNumber(rec.expected_uzs || 0)} so'm`);
+      setTxt('rec-uyga-uzs', `${formatNumber(rec.today_uyga_uzs || 0)} so'm`);
+      const diffUzs = Number(rec.diff_uzs || 0);
+      const diffEl = document.getElementById('rec-diff-uzs');
+      if (diffEl) {
+        if (diffUzs === 0) {
+          diffEl.innerText = "✅ To'g'ri (0 so'm)";
+          diffEl.style.color = "#00F5A0";
+        } else if (diffUzs > 0) {
+          diffEl.innerText = `+${formatNumber(diffUzs)} so'm (Ortiqcha)`;
+          diffEl.style.color = "#00F2FE";
+        } else {
+          diffEl.innerText = `${formatNumber(diffUzs)} so'm (Kamomad)`;
+          diffEl.style.color = "#FF3366";
+        }
+      }
+      const usdLine = document.getElementById('rec-usd-line');
+      if (usdLine) {
+        if ((rec.expected_usd || 0) !== 0 || (rec.today_uyga_usd || 0) !== 0 || (rec.today_in_usd || 0) !== 0) {
+          usdLine.style.display = 'block';
+          usdLine.innerText = `💵 Dollar kassa: $${formatNumber(rec.expected_usd || 0)} | Uyga: $${formatNumber(rec.today_uyga_usd || 0)} | Farq: $${formatNumber(rec.diff_usd || 0)}`;
+        } else {
+          usdLine.style.display = 'none';
+        }
+      }
 
       if (data.chart && typeof Chart !== 'undefined') renderSalesChart(data.chart);
       if (data.top_debtors && typeof Chart !== 'undefined') renderDebtDoughnut(data.top_debtors);
@@ -1301,9 +1383,48 @@
         const res = await apiFetch('/api/settings');
         const data = await res.json();
         globalSettings = data.settings || {};
+        const sheetsInput = document.getElementById('sheets-url-input');
+        if (sheetsInput && globalSettings.google_sheets_url) {
+          sheetsInput.value = globalSettings.google_sheets_url;
+        }
         renderSettingsUI();
       } catch (e) {
         container.innerHTML = '<div style="color:#FF3366; font-size:11px; text-align:center;">Yuklashda xatolik</div>';
+      }
+    }
+
+    async function importGoogleSheets() {
+      const urlEl = document.getElementById('sheets-url-input');
+      const statusEl = document.getElementById('sheets-import-status');
+      const url = (urlEl?.value || '').trim();
+      if (statusEl) {
+        statusEl.style.color = '#00F2FE';
+        statusEl.innerText = 'Yuklanmoqda...';
+      }
+      try {
+        const res = await apiFetch('/api/import-sheets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (statusEl) {
+            statusEl.style.color = '#00F5A0';
+            statusEl.innerText = `✅ Yuklandi! Yangi: ${data.imported} ta, Yangilandi: ${data.updated} ta.`;
+          }
+          if (typeof loadCustomers === 'function') loadCustomers();
+        } else {
+          if (statusEl) {
+            statusEl.style.color = '#FF3366';
+            statusEl.innerText = `⚠️ ${data.error || 'Xatolik yuz berdi'}`;
+          }
+        }
+      } catch (e) {
+        if (statusEl) {
+          statusEl.style.color = '#FF3366';
+          statusEl.innerText = '⚠️ Serverga ulanishda xatolik';
+        }
       }
     }
 
@@ -1759,6 +1880,13 @@
       </div>
 
       <div class="modal-body">
+        <div style="margin-bottom:14px; padding:12px; border-radius:12px; background:rgba(0,242,254,0.06); border:1px solid rgba(0,242,254,0.2);">
+          <div style="font-size:12px; font-weight:800; color:#FFF; margin-bottom:4px;">📊 Google Sheets Mijozlar Bazasi</div>
+          <div style="font-size:10px; color:#94A3B8; margin-bottom:8px;">Asl mijozlar jadvali havolasini kiriting (hamma ko'ra oladigan qilib ochilgan bo'lishi kerak):</div>
+          <input type="text" id="sheets-url-input" placeholder="https://docs.google.com/spreadsheets/d/..." style="width:100%; background:#0B111E; border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:8px 10px; color:#FFF; font-size:11px; outline:none; margin-bottom:8px;">
+          <button onclick="importGoogleSheets()" style="width:100%; padding:8px 12px; border-radius:10px; background:linear-gradient(135deg,#00F2FE,#00F5A0); border:none; color:#0B111E; font-weight:800; font-size:11px; cursor:pointer;">📥 Bazani Yuklash / Sinxronlash</button>
+          <div id="sheets-import-status" style="font-size:10px; margin-top:6px; color:#94A3B8;"></div>
+        </div>
         <div id="settings-modules-list" style="display:flex; flex-direction:column; gap:10px;">
           <div style="text-align:center; color:#00F2FE; font-size:11px; padding:20px;">Yuklanmoqda...</div>
         </div>
