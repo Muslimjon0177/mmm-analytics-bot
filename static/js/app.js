@@ -22,6 +22,16 @@ const tg = window.Telegram?.WebApp;
       return Number(num).toLocaleString('uz-UZ').replace(/,/g, ' ');
     }
 
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function buySubscription() {
       if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
       const text = encodeURIComponent("men sotib olmoqchiman");
@@ -60,20 +70,24 @@ function switchTab(tab) {
   const activeNav = document.getElementById(`nav-${tab}`);
   if (activeNav) activeNav.classList.add('active');
 
-  if (tab === 'customers') ensureScript('/static/js/customers.js').then(() => loadCustomers());
-  if (tab === 'records') ensureScript('/static/js/records.js').then(() => loadRecords());
+  if (tab === 'customers') ensureScript('/static/js/customers.js?v=3').then(() => loadCustomers());
+  if (tab === 'records') ensureScript('/static/js/records.js?v=3').then(() => loadRecords());
   if (tab === 'dashboard') loadDashboardStats();
 }
 
 function openSettingsModal() {
-  ensureScript('/static/js/settings.js').then(() => if (typeof window._settingsReady === 'function') window._settingsReady());
+  ensureScript('/static/js/settings.js?v=3').then(() => {
+    if (typeof window._settingsReady === 'function') window._settingsReady();
+  });
 }
 function openCustomerDetail(partnerName) {
-  ensureScript('/static/js/customers.js').then(() => if (typeof window._customerDetailReady === 'function') window._customerDetailReady(partnerName));
+  ensureScript('/static/js/customers.js?v=3').then(() => {
+    if (typeof window._customerDetailReady === 'function') window._customerDetailReady(partnerName);
+  });
 }
 function filterAndSwitch(cat) {
   switchTab('records');
-  ensureScript('/static/js/records.js').then(() => setRecordCategory(cat));
+  ensureScript('/static/js/records.js?v=3').then(() => setRecordCategory(cat));
 }
 
 
@@ -274,9 +288,15 @@ function changePeriod(period) {
 
         if (r.category === 'naqd') { badgeColor = '#00F5A0'; badgeBg = 'rgba(0, 245, 160, 0.15)'; badgeText = 'Naqd'; }
         else if (r.category === 'nasiya') { badgeColor = '#FF3366'; badgeBg = 'rgba(255, 51, 102, 0.15)'; badgeText = 'Nasiya'; }
+        else if (r.category === 'rasxod') { badgeColor = '#F97316'; badgeBg = 'rgba(249, 115, 22, 0.15)'; badgeText = 'Rasxod'; }
+        else if (r.category === 'uyga') { badgeColor = '#A855F7'; badgeBg = 'rgba(168, 85, 247, 0.15)'; badgeText = 'Uyga'; }
+        else if (r.category === 'qaytarish') { badgeColor = '#FFB800'; badgeBg = 'rgba(255, 184, 0, 0.15)'; badgeText = 'Qaytarish'; }
+        else if (r.category === 'kelim') { badgeColor = '#38BDF8'; badgeBg = 'rgba(56, 189, 248, 0.15)'; badgeText = 'Kelim'; }
 
-        const title = r.partner_name ? `${r.partner_name}: ${r.item_name || 'Savdo'}` : (r.item_name || 'Tovar');
-        const timeBadge = r.time_str ? ` • ${r.time_str}` : '';
+        const rawTitle = r.partner_name ? `${r.partner_name}: ${r.item_name || 'Savdo'}` : (r.item_name || badgeText);
+        const title = escapeHtml(rawTitle);
+        const timeBadge = r.time_str ? ` • ${escapeHtml(r.time_str)}` : '';
+        const amtText = (r.currency === 'USD' && r.amount_usd) ? `$${formatNumber(r.amount_usd)}` : `${formatNumber(r.total_amount)} so'm`;
 
         container.innerHTML += `
           <div style="display:flex; align-items:center; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.03);">
@@ -284,10 +304,10 @@ function changePeriod(period) {
               <span style="font-size:9px; font-weight:900; color:${badgeColor}; background:${badgeBg}; padding:2px 6px; border-radius:12px;">${badgeText}</span>
               <div>
                 <div style="font-size:11px; font-weight:700; color:#FFF;">${title}</div>
-                <div style="font-size:9px; color:#64748B;">${r.date_str}${timeBadge}</div>
+                <div style="font-size:9px; color:#64748B;">${escapeHtml(r.date_str)}${timeBadge}</div>
               </div>
             </div>
-            <div style="font-size:11px; font-weight:900; color:#FFF;">${formatNumber(r.total_amount)} so'm</div>
+            <div style="font-size:11px; font-weight:900; color:#FFF;">${amtText}</div>
           </div>
         `;
       });
@@ -315,8 +335,8 @@ let searchTimeout = null;
     function debounceSearch(type) {
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => {
-        if (type === 'customers') loadCustomers();
-        else if (type === 'records') loadRecords();
+        if (type === 'customers') ensureScript('/static/js/customers.js?v=3').then(() => loadCustomers());
+        else if (type === 'records') ensureScript('/static/js/records.js?v=3').then(() => loadRecords());
       }, 300);
     }
 
@@ -326,8 +346,8 @@ let searchTimeout = null;
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
 
       if (currentTab === 'dashboard') loadDashboardStats();
-      else if (currentTab === 'customers') loadCustomers();
-      else if (currentTab === 'records') loadRecords();
+      else if (currentTab === 'customers') ensureScript('/static/js/customers.js?v=3').then(() => loadCustomers());
+      else if (currentTab === 'records') ensureScript('/static/js/records.js?v=3').then(() => loadRecords());
 
       setTimeout(() => { if (icon) icon.style.transform = 'rotate(0deg)'; }, 400);
     }
@@ -401,6 +421,8 @@ let searchTimeout = null;
 
     // Sahifa yuklanishi bilan ishga tushirish
 
-window.addEventListener('load', () => {
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
   initApp();
-});
+}

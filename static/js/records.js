@@ -49,10 +49,19 @@ async function loadRecords() {
             bColor = '#00F5A0'; bBg = 'rgba(0, 245, 160, 0.15)'; bText = 'Naqd';
           } else if (r.category === 'nasiya') {
             bColor = '#FF3366'; bBg = 'rgba(255, 51, 102, 0.15)'; bText = 'Nasiya';
+          } else if (r.category === 'rasxod') {
+            bColor = '#F97316'; bBg = 'rgba(249, 115, 22, 0.15)'; bText = 'Rasxod';
+          } else if (r.category === 'uyga') {
+            bColor = '#A855F7'; bBg = 'rgba(168, 85, 247, 0.15)'; bText = 'Uyga';
+          } else if (r.category === 'qaytarish') {
+            bColor = '#FFB800'; bBg = 'rgba(255, 184, 0, 0.15)'; bText = 'Qaytarish';
+          } else if (r.category === 'kelim') {
+            bColor = '#38BDF8'; bBg = 'rgba(56, 189, 248, 0.15)'; bText = 'Kelim';
           }
 
-          const timeBadge = r.time_str ? ` • ${r.time_str}` : '';
-          const title = r.partner_name ? `${r.partner_name}: ${r.item_name || 'Savdo'}` : (r.item_name || 'Tovar');
+          const timeBadge = r.time_str ? ` • ${escapeHtml(r.time_str)}` : '';
+          const title = escapeHtml(r.partner_name ? `${r.partner_name}: ${r.item_name || 'Savdo'}` : (r.item_name || bText));
+          const amtHtml = (r.currency === 'USD' && r.amount_usd) ? `$${formatNumber(r.amount_usd)}` : `${formatNumber(r.total_amount)} so'm`;
 
           container.innerHTML += `
             <div class="glass-card" style="padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
@@ -61,9 +70,9 @@ async function loadRecords() {
                   <span style="font-size:9px; font-weight:900; color:${bColor}; background:${bBg}; padding:1px 6px; border-radius:8px;">${bText}</span>
                   <div style="font-size:12px; font-weight:800; color:#FFF;">${title}</div>
                 </div>
-                <div style="font-size:9px; color:#64748B;">${r.date_str}${timeBadge} • ${r.quantity || ''} ${r.unit || ''}</div>
+                <div style="font-size:9px; color:#64748B;">${escapeHtml(r.date_str)}${timeBadge} ${r.quantity ? '• ' + escapeHtml(r.quantity) + ' ' + escapeHtml(r.unit || '') : ''}</div>
               </div>
-              <div style="font-size:12px; font-weight:900; color:#00F5A0;">${formatNumber(r.total_amount)} so'm</div>
+              <div style="font-size:12px; font-weight:900; color:${bColor};">${amtHtml}</div>
             </div>
           `;
         });

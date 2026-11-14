@@ -155,13 +155,13 @@ function closeCustomerModal(e) {
 
         customers.forEach((c, idx) => {
           const isDebtor = (c.current_balance || 0) > 0;
-          const safeName = (c.display_name || c.name || '').replace(/'/g, "\\'");
+          const dispName = escapeHtml(c.display_name || c.name || '');
           container.innerHTML += `
-            <div onclick="openCustomerDetail('${safeName}')" class="glass-card customer-card-item" style="padding:12px 14px; border-color:${isDebtor ? 'rgba(255,51,102,0.3)' : 'rgba(0,245,160,0.2)'}">
+            <div data-cust="${dispName}" onclick="openCustomerDetail(this.dataset.cust)" class="glass-card customer-card-item" style="padding:12px 14px; border-color:${isDebtor ? 'rgba(255,51,102,0.3)' : 'rgba(0,245,160,0.2)'}">
               <div style="display:flex; align-items:center; justify-content:space-between;">
                 <div>
                   <div style="font-size:12px; font-weight:900; color:#FFF; display:flex; align-items:center; gap:6px;">
-                    <span style="color:#64748B; font-size:10px;">${idx+1}.</span> ${c.display_name}
+                    <span style="color:#64748B; font-size:10px;">${idx+1}.</span> ${dispName}
                   </div>
                   <div style="font-size:9px; color:#64748B; margin-top:2px;">
                     Nasiya: ${formatNumber(c.total_credit || 0)} • To'lov: ${formatNumber(c.total_paid || 0)}
