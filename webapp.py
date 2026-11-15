@@ -5,6 +5,8 @@ import json
 import time
 import hashlib
 import logging
+import threading
+from collections import defaultdict
 from typing import Optional
 from urllib.parse import parse_qsl
 from datetime import datetime, timezone
@@ -29,6 +31,32 @@ from currency import get_usd_rate
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder="static")
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
+
+# Xavfsiz Rate Limiter (har bir IP uchun /api/* ga daqiqasiga 90 ta so'rov)
+_RATE_LOCK = threading.Lock()
+_RATE_BUCKETS = defaultdict(list)
+_RATE_LIMIT = 90
+_RATE_WINDOW = 60.0
+
+@app.before_request
+def check_api_rate_limit():
+    if not request.path.startswith("/api/"):
+        return None
+    ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "unknown").split(",")[0].strip()
+    now = time.time()
+    with _RATE_LOCK:
+        hits = [ts for ts in _RATE_BUCKETS[ip] if now - ts < _RATE_WINDOW]
+        if len(hits) >= _RATE_LIMIT:
+            _RATE_BUCKETS[ip] = hits
+            return jsonify({"error": "Juda ko'p so'rov yuborildi. Bir daqiqadan so'ng qayta urinib ko'ring."}), 429
+        hits.append(now)
+        _RATE_BUCKETS[ip] = hits
+    return None
 
 _bot_instance: telebot.TeleBot = None
 
@@ -405,12 +433,45 @@ def api_export_excel():
         logger.error(f"Excel eksportda xatolik: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route("/privacy")
+def privacy_policy():
+    """Maxfiylik siyosati (Privacy Policy) sahifasi"""
+    html_doc = """<!DOCTYPE html><html lang="uz"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Maxfiylik Siyosati — MMM Analytics</title>
+    <style>body{font-family:system-ui,sans-serif;background:#06090F;color:#E2E8F0;max-width:720px;margin:0 auto;padding:24px;line-height:1.6}
+    h1,h2{color:#00F2FE}a{color:#00F5A0}.card{background:#0F172A;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:18px;margin-top:16px}</style></head>
+    <body><h1>🔒 Maxfiylik Siyosati (Privacy Policy)</h1><p><b>MMM Analytics</b> savdo va ombor boshqaruvi tizimi foydalanuvchilarning tijoriy ma'lumotlarini qat'iy maxfiy saqlaydi.</p>
+    <div class="card"><h2>1. Yig'iladigan ma'lumotlar</h2><p>Tizim faqat siz ruxsat bergan Telegram guruhidagi savdo, kirim-chiqim, to'lov yozuvlari hamda mijozlar ro'yxatini qayta ishlaydi. Telegram Mini App autentifikatsiyasi kriptografik <code>initData</code> imzosi orqali tekshiriladi va uchinchi shaxslar cookie fayllaridan foydalanmaydi.</p>
+    <h2>2. Ma'lumotlarni saqlash va himoya</h2><p>Barcha yozuvlar shifrlangan HTTPS aloqasi orqali bulutli ma'lumotlar bazasida (Turso) saqlanadi va boshqa do'kon yoki uchinchi shaxslarga berilmaydi.</p>
+    <h2>3. Foydalanuvchi huquqlari</h2><p>Siz istalgan vaqtda o'z ma'lumotlaringizni Excel formatida yuklab olishingiz yoki to'liq o'chirtirishingiz mumkin. Murojaat uchun: <a href="https://t.me/fbr_a">@fbr_a</a></p></div></body></html>"""
+    return html_doc, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+@app.route("/terms")
+def terms_of_service():
+    """Ommaviy Oferta (Xizmat ko'rsatish shartlari) sahifasi"""
+    html_doc = """<!DOCTYPE html><html lang="uz"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Ommaviy Oferta — MMM Analytics</title>
+    <style>body{font-family:system-ui,sans-serif;background:#06090F;color:#E2E8F0;max-width:720px;margin:0 auto;padding:24px;line-height:1.6}
+    h1,h2{color:#00F2FE}a{color:#00F5A0}.card{background:#0F172A;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:18px;margin-top:16px}</style></head>
+    <body><h1>📄 Ommaviy Oferta (Foydalanish shartlari)</h1><p>Ushbu hujjat <b>MMM Analytics</b> SaaS platformasidan foydalanish tartibini belgilaydi.</p>
+    <div class="card"><h2>1. Xizmat tavsifi</h2><p>Platforma Telegram guruhlaridagi savdo, nasiya, kassa va ombor hisob-kitoblarini avtomatlashtirish hamda Mini App orqali tahlil qilish xizmatini taqdim etadi.</p>
+    <h2>2. Obuna va to'lov</h2><p>Xizmat oylik obuna asosida taqdim etiladi. Zaxira nusxalari har kuni avtomatik shakllantiriladi.</p>
+    <h2>3. Aloqa</h2><p>Texnik yordam va ulanish masalalari bo'yicha: <a href="https://t.me/fbr_a">@fbr_a</a></p></div></body></html>"""
+    return html_doc, 200, {"Content-Type": "text/html; charset=utf-8"}
+
 @app.after_request
 def add_cache_headers(response):
     if request.path.startswith("/static") or request.path == "/":
         response.headers["Cache-Control"] = "public, max-age=120"
     elif request.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    # Xavfsizlik sarlavhalari (Security Headers)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    response.headers["Content-Security-Policy"] = "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org;"
+    if ENVIRONMENT == "production" or request.is_secure:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 def run_server(port=WEB_APP_PORT):
