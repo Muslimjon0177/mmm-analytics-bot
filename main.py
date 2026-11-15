@@ -198,7 +198,13 @@ def generate_today_summary_text(target_date: Optional[str] = None) -> str:
                 "",
                 f"⚖️ <b>KASSA MANTIQI ({target_date}):</b>",
                 f"• Kechagi qoldiq qo'shildi: <b>{format_number(rec.get('yesterday_net_uzs', 0))} so'm</b>",
-                f"• Bugungi naqd + pul keldi: <b>{format_number(rec.get('today_in_uzs', 0))} so'm</b>",
+                f"• Bugungi sof naqd + pul keldi: <b>{format_number(rec.get('today_in_uzs', 0))} so'm</b>",
+            ])
+            if rec.get("today_card_uzs"):
+                lines.append(f"• 💳 Karta tushumi (alohida): <b>-{format_number(rec.get('today_card_uzs', 0))} so'm</b>")
+            if rec.get("today_usd_uzs_equiv"):
+                lines.append(f"• 💵 Dollar kursda ayrildi (alohida $): <b>-{format_number(rec.get('today_usd_uzs_equiv', 0))} so'm</b>")
+            lines.extend([
                 f"• 💸 Rasxodlar ayrildi: <b>-{format_number(rec.get('today_rasxod_uzs', 0))} so'm</b>",
                 f"• 💼 Kassada bo'lishi kerak: <b>{format_number(rec.get('expected_uzs', 0))} so'm</b>",
                 f"• 🏠 Uyga ketyapti: <b>{format_number(rec.get('today_uyga_uzs', 0))} so'm</b>",
@@ -386,7 +392,8 @@ def save_parsed_records(result: dict, text: str, sender_name: str, chat_id: int,
             chat_id=chat_id,
             message_id=message_id,
             date_str=date_str,
-            time_str=time_str
+            time_str=time_str,
+            payment_method=rec.get("payment_method", "cash")
         )
     return ambiguous_candidates
 
@@ -400,7 +407,8 @@ def format_saved_lines(chat_id: int, message_id: int) -> list:
         item_str = f"{qty} {r.get('unit') or ''} {r.get('item_name') or ''}".strip()
         tot_str = f" — <b>{format_number(r.get('total_amount'))} so'm</b>" if r.get("total_amount") else ""
         usd_extra = f" (${format_number(r.get('amount_usd'))})" if r.get("currency") == "USD" and r.get("amount_usd") else ""
-        lines.append(f"{badge}: {p_str}{item_str}{tot_str}{usd_extra}")
+        card_extra = " [💳 Karta]" if r.get("payment_method") == "card" else ""
+        lines.append(f"{badge}: {p_str}{item_str}{tot_str}{usd_extra}{card_extra}")
     return lines
 
 def review_keyboard(chat_id: int, message_id: int, ambiguous_candidates: list = None) -> InlineKeyboardMarkup:

@@ -218,7 +218,8 @@ def init_db():
                 raw_message TEXT,
                 sender_name TEXT,
                 chat_id INTEGER,
-                message_id INTEGER
+                message_id INTEGER,
+                payment_method TEXT DEFAULT 'cash'
             );
             """,
             """
@@ -260,6 +261,8 @@ def init_db():
                 migrations.append("ALTER TABLE records ADD COLUMN amount_usd REAL;")
             if "exchange_rate" not in existing_cols:
                 migrations.append("ALTER TABLE records ADD COLUMN exchange_rate REAL;")
+            if "payment_method" not in existing_cols:
+                migrations.append("ALTER TABLE records ADD COLUMN payment_method TEXT DEFAULT 'cash';")
             
             for mig in migrations:
                 try:
@@ -541,6 +544,7 @@ def save_record(
     message_id: int = 0,
     date_str: Optional[str] = None,
     time_str: Optional[str] = None,
+    payment_method: str = "cash",
 ) -> int:
     now = get_now()
     if not date_str:
@@ -548,8 +552,8 @@ def save_record(
     if not time_str:
         time_str = now.strftime("%H:%M:%S")
 
-    # 1. Narxlardagi 3 ta nol qoidasi (masalan 170 -> 170000)
-    if price is not None and 0 < price < 1000:
+    # 1. Narxlardagi 3 ta nol qoidasi (masalan 170 -> 170000), faqat UZS uchun
+    if price is not None and 0 < price < 1000 and currency != "USD":
         price = price * 1000
 
     # 2. Jami summa: soni va narxi ma'lum bo'lsa, summa HAR DOIM kod orqali hisoblanadi
@@ -576,12 +580,14 @@ def save_record(
             INSERT INTO records (
                 date_str, time_str, category, item_name, quantity, unit,
                 price, total_amount, partner_name, currency, amount_usd,
-                exchange_rate, balance, raw_message, sender_name, chat_id, message_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                exchange_rate, balance, raw_message, sender_name, chat_id, message_id,
+                payment_method
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             date_str, time_str, category, item_name, quantity, unit,
             price, total_amount, partner_name_cleaned, currency, amount_usd,
-            exchange_rate, balance, raw_message, sender_name, chat_id, message_id
+            exchange_rate, balance, raw_message, sender_name, chat_id, message_id,
+            payment_method or "cash"
         ])
         record_id = res.last_insert_rowid
     finally:
@@ -645,7 +651,7 @@ def reassign_message_partner(chat_id: int, message_id: int, new_partner: str):
     recalculate_customer_balance(new_partner)
 
 def _query_day_metrics(client, date_str: str) -> Dict[str, Any]:
-    """Bir kunlik barcha toifalar (so'm va dollar ajratilgan holda)"""
+    """Bir kunlik barcha toifalar (sof so'm naqd, karta, dollar va dollarning so'm ekvivalenti ajratilgan holda)"""
     res = client.execute("""
         SELECT
             category,
@@ -653,14 +659,19 @@ def _query_day_metrics(client, date_str: str) -> Dict[str, Any]:
             COALESCE(SUM(total_amount), 0) as tot_uzs_equiv,
             COALESCE(SUM(quantity), 0) as qty,
             COALESCE(SUM(CASE WHEN currency = 'USD' THEN COALESCE(amount_usd, 0) ELSE 0 END), 0) as usd_sum,
-            COALESCE(SUM(CASE WHEN currency != 'USD' OR currency IS NULL THEN COALESCE(total_amount, 0) ELSE 0 END), 0) as uzs_only
+            COALESCE(SUM(CASE WHEN (currency != 'USD' OR currency IS NULL) AND COALESCE(payment_method, 'cash') != 'card' THEN COALESCE(total_amount, 0) ELSE 0 END), 0) as uzs_cash_only,
+            COALESCE(SUM(CASE WHEN COALESCE(payment_method, 'cash') = 'card' THEN COALESCE(total_amount, 0) ELSE 0 END), 0) as card_sum,
+            COALESCE(SUM(CASE WHEN currency = 'USD' THEN COALESCE(total_amount, 0) ELSE 0 END), 0) as usd_uzs_equiv
         FROM records
         WHERE date_str = ?
         GROUP BY category
     """, [date_str])
     out = {}
     for cat in ("kelim", "naqd", "nasiya", "pul_keldi", "qaytarish", "rasxod", "uyga"):
-        out[cat] = {"count": 0, "total_sum": 0.0, "qty": 0.0, "usd_sum": 0.0, "uzs_sum": 0.0}
+        out[cat] = {
+            "count": 0, "total_sum": 0.0, "qty": 0.0,
+            "usd_sum": 0.0, "uzs_sum": 0.0, "card_sum": 0.0, "usd_uzs_equiv": 0.0
+        }
     for row in res.rows:
         cat = row[0]
         if cat in out:
@@ -670,19 +681,24 @@ def _query_day_metrics(client, date_str: str) -> Dict[str, Any]:
                 "qty": float(row[3] or 0),
                 "usd_sum": float(row[4] or 0),
                 "uzs_sum": float(row[5] or 0),
+                "card_sum": float(row[6] or 0),
+                "usd_uzs_equiv": float(row[7] or 0),
             }
     return out
 
 def compute_cash_reconciliation(client, target_date: str) -> Dict[str, Any]:
     """Kunlik kassa mantiqi:
-    (Bugungi Naqd + Bugungi Pul Keldi + Kechagi savdodan qolgan pul - Bugungi Rasxod) vs (Uyga ketyapti) -> Farq"""
+    1) Bugungi jami naqd + pul keldi dan KARTA (qavs ichida karta) va DOLLAR (kursga pichilib alohida $) ayriladi -> Sof So'm Naqd.
+    2) Kechagi kundan qolgan sof qoldiq (+) qo'shiladi.
+    3) Bugungi Rasxodlar (-) ayriladi -> Kassada bo'lishi kerak (So'm va $).
+    4) Uyga ketyapti bilan solishtirilib Farq chiqariladi."""
     dt = datetime.strptime(target_date, "%Y-%m-%d")
     yesterday_str = (dt - timedelta(days=1)).strftime("%Y-%m-%d")
 
     t = _query_day_metrics(client, target_date)
     y = _query_day_metrics(client, yesterday_str)
 
-    # Kechagi kunning sof naqd qoldig'i (agar kecha uyga ketmagan bo'lsa bugunga qo'shiladi)
+    # Kechagi kunning sof naqd qoldig'i (faqat naqd so'm: karta va dollar ayrilgan holda)
     y_in_uzs = y["naqd"]["uzs_sum"] + y["pul_keldi"]["uzs_sum"]
     y_out_uzs = y["rasxod"]["uzs_sum"] + y["uyga"]["uzs_sum"]
     y_carry_uzs = max(0.0, round(y_in_uzs - y_out_uzs, 2))
@@ -691,13 +707,17 @@ def compute_cash_reconciliation(client, target_date: str) -> Dict[str, Any]:
     y_out_usd = y["rasxod"]["usd_sum"] + y["uyga"]["usd_sum"]
     y_carry_usd = max(0.0, round(y_in_usd - y_out_usd, 2))
 
-    t_in_uzs = t["naqd"]["uzs_sum"] + t["pul_keldi"]["uzs_sum"]
+    # Bugungi tushumlar tafsiloti
+    t_gross_uzs_equiv = round(t["naqd"]["total_sum"] + t["pul_keldi"]["total_sum"], 2)
+    t_card_uzs = round(t["naqd"]["card_sum"] + t["pul_keldi"]["card_sum"], 2)
+    t_usd_uzs_equiv = round(t["naqd"]["usd_uzs_equiv"] + t["pul_keldi"]["usd_uzs_equiv"], 2)
+    t_in_uzs = round(t["naqd"]["uzs_sum"] + t["pul_keldi"]["uzs_sum"], 2)  # Sof so'm naqd (karta va dollar ayrilgan)
     t_rasxod_uzs = t["rasxod"]["uzs_sum"]
     t_uyga_uzs = t["uyga"]["uzs_sum"]
     expected_uzs = round(t_in_uzs + y_carry_uzs - t_rasxod_uzs, 2)
     diff_uzs = round(expected_uzs - t_uyga_uzs, 2)
 
-    t_in_usd = t["naqd"]["usd_sum"] + t["pul_keldi"]["usd_sum"]
+    t_in_usd = round(t["naqd"]["usd_sum"] + t["pul_keldi"]["usd_sum"], 2)
     t_rasxod_usd = t["rasxod"]["usd_sum"]
     t_uyga_usd = t["uyga"]["usd_sum"]
     expected_usd = round(t_in_usd + y_carry_usd - t_rasxod_usd, 2)
@@ -710,6 +730,9 @@ def compute_cash_reconciliation(client, target_date: str) -> Dict[str, Any]:
         "today_naqd_usd": t["naqd"]["usd_sum"],
         "today_pul_uzs": t["pul_keldi"]["uzs_sum"],
         "today_pul_usd": t["pul_keldi"]["usd_sum"],
+        "today_gross_uzs_equiv": t_gross_uzs_equiv,
+        "today_card_uzs": t_card_uzs,
+        "today_usd_uzs_equiv": t_usd_uzs_equiv,
         "yesterday_naqd_total_uzs": y_in_uzs,
         "yesterday_naqd_total_usd": y_in_usd,
         "yesterday_carry_uzs": y_carry_uzs,
@@ -829,19 +852,20 @@ def get_advanced_stats(period: str = "7days") -> Dict[str, Any]:
         kpi_res = client.execute("""
             SELECT 
                 COALESCE(SUM(CASE WHEN category = 'naqd' AND COALESCE(currency, 'UZS') != 'USD' THEN total_amount ELSE 0 END), 0) as total_naqd_sum,
-                COALESCE(SUM(CASE WHEN category = 'naqd' AND currency = 'USD' THEN total_amount ELSE 0 END), 0) as total_naqd_usd,
+                COALESCE(SUM(CASE WHEN category = 'naqd' AND currency = 'USD' THEN COALESCE(amount_usd, 0) ELSE 0 END), 0) as total_naqd_usd,
                 COUNT(CASE WHEN category = 'naqd' THEN 1 END) as count_naqd,
                 COALESCE(SUM(CASE WHEN category = 'nasiya' AND COALESCE(currency, 'UZS') != 'USD' THEN total_amount ELSE 0 END), 0) as total_nasiya_sum,
                 COUNT(CASE WHEN category = 'nasiya' THEN 1 END) as count_nasiya,
                 COALESCE(SUM(CASE WHEN category = 'pul_keldi' AND COALESCE(currency, 'UZS') != 'USD' THEN total_amount ELSE 0 END), 0) as total_paid_sum,
-                COALESCE(SUM(CASE WHEN category = 'pul_keldi' AND currency = 'USD' THEN total_amount ELSE 0 END), 0) as total_paid_usd,
+                COALESCE(SUM(CASE WHEN category = 'pul_keldi' AND currency = 'USD' THEN COALESCE(amount_usd, 0) ELSE 0 END), 0) as total_paid_usd,
                 COUNT(CASE WHEN category = 'pul_keldi' THEN 1 END) as count_paid,
                 COALESCE(SUM(CASE WHEN category = 'kelim' AND COALESCE(currency, 'UZS') != 'USD' THEN total_amount ELSE 0 END), 0) as total_kelim_sum,
                 COUNT(CASE WHEN category = 'kelim' THEN 1 END) as count_kelim,
                 COALESCE(SUM(CASE WHEN category = 'rasxod' AND COALESCE(currency, 'UZS') != 'USD' THEN total_amount ELSE 0 END), 0) as total_rasxod_sum,
-                COALESCE(SUM(CASE WHEN category = 'rasxod' AND currency = 'USD' THEN total_amount ELSE 0 END), 0) as total_rasxod_usd,
+                COALESCE(SUM(CASE WHEN category = 'rasxod' AND currency = 'USD' THEN COALESCE(amount_usd, 0) ELSE 0 END), 0) as total_rasxod_usd,
                 COALESCE(SUM(CASE WHEN category = 'uyga' AND COALESCE(currency, 'UZS') != 'USD' THEN total_amount ELSE 0 END), 0) as total_uyga_sum,
-                COALESCE(SUM(CASE WHEN category = 'uyga' AND currency = 'USD' THEN total_amount ELSE 0 END), 0) as total_uyga_usd
+                COALESCE(SUM(CASE WHEN category = 'uyga' AND currency = 'USD' THEN COALESCE(amount_usd, 0) ELSE 0 END), 0) as total_uyga_usd,
+                COALESCE(SUM(CASE WHEN COALESCE(payment_method, 'cash') = 'card' THEN total_amount ELSE 0 END), 0) as total_card_sum
             FROM records
             WHERE date_str BETWEEN ? AND ?
         """, [start_date, end_date])

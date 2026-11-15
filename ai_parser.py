@@ -15,8 +15,9 @@ Sen savdo va ombor tizimlaridagi xabarlarni tahlil qiluvchi o'ta aniq AI tahlilc
 Guruhdagi xabarlardan quyidagi 7 toifani ajratib, JSON formatida qaytarishing kerak:
 
 1. "naqd" - Naqd savdo:
-   - Qoida: Agar tovar sotilgani yozilgan bo'lsa, lekin MIJOZ / ODAM ISMI YO'Q bo'lsa (masalan: "2ta olmanok 170 dan", "10 qop un 320 dan", "naqd 200$", "200 dollar naqd savdo") -> bu "naqd" savdo!
-   - Agar naqd savdo dollarda bo'lsa ($ yoki "dollar"): currency: "USD", amount_usd: 200 deb ajrating!
+   - Qoida: Agar tovar sotilgani yozilgan bo'lsa, lekin MIJOZ / ODAM ISMI YO'Q bo'lsa (masalan: "2ta olmanok 170 dan", "10 qop un 320 dan", "naqd 200$", "200 dollar naqd savdo", "5ta olma 170dan (100$)") -> bu "naqd" savdo!
+   - Agar naqd savdoda qavs ichida yoki alohida dollar yozilgan bo'lsa (masalan: "(200$)", "($200)", "(150 dollar)", "200$"): bizga tushgan dollar sifatida currency: "USD", amount_usd: 200 deb ajrating!
+   - Agar bitta xabarda ham so'm tovar, ham qavs ichida dollar bo'lsa (masalan: "5ta olma 170dan (100$)"), IKKITA alohida record qaytaring: 1) so'mdagi naqd savdo (currency: "UZS"), 2) tushgan dollar (category: "naqd", currency: "USD", amount_usd: 100).
    - partner_name: null bo'ladi.
 
 2. "nasiya" - Nasiya (qarzga) savdo:
@@ -24,8 +25,9 @@ Guruhdagi xabarlardan quyidagi 7 toifani ajratib, JSON formatida qaytarishing ke
    - partner_name: mijoz ismi ("Akmal aka", "Suxrob Denov" va h.k.).
 
 3. "pul_keldi" - Kassaga pul to'lash (qarz yopish):
-   - Qoida: Agar ism yozilib pul berildi, pul keldi, qarz to'landi deb yozilsa (masalan: "Akmal aka 500000 berdi", "Jamshiddan (100$) pul keldi", "Olim aka 50$ berdi") -> bu "pul_keldi" toifasi!
+   - Qoida: Agar ism yozilib pul berildi, pul keldi, qarz to'landi deb yozilsa (masalan: "Akmal aka 500000 berdi", "Jamshiddan (100$) pul keldi", "Olim aka 50$ berdi", "Ali aka 1 mln (karta) berdi") -> bu "pul_keldi" toifasi!
    - Agar summa dollarda bo'lsa ($ belgisi, qavsda masalan (100$), yoki "dollar"): currency: "USD", amount_usd: 100 deb ajrating.
+   - Agar to'lov karta/plastik/click/payme orqali bo'lsa (masalan: "(karta)", "(plastik)", "karta orqali"): payment_method: "card", aks holda "cash" deb belgilang!
    - Agar so'mda bo'lsa: currency: "UZS", total_amount: 500000.
 
 4. "kelim" - Omborga tovar kelishi (kirim):
@@ -333,9 +335,81 @@ def fallback_regex_parser(text: str) -> Dict[str, Any]:
             "amount_usd": None
         })
 
-    return {"is_relevant": len(records) > 0, "records": records}
+    return _ensure_parenthesized_usd(records, text)
 
 VALID_CATEGORIES = ("naqd", "nasiya", "pul_keldi", "kelim", "qaytarish", "rasxod", "uyga")
+
+def _has_card_marker(text: str) -> bool:
+    """Xabarda (karta), (plastik), (click), (payme), (uzcard), (humo) belgisi borligini aniqlaydi"""
+    if not text:
+        return False
+    return bool(re.search(
+        r'\(\s*(?:karta|plastik|click|payme|uzcard|humo|perevod|terminal)\s*\)|\b(?:karta|plastik|uzcard|humo)\b',
+        text, flags=re.IGNORECASE
+    ))
+
+def _extract_parenthesized_usd(text: str) -> List[float]:
+    """Xabardagi qavs ichiga yozilgan dollar summalarini topadi: (200$), ($200), (150 dollar)"""
+    if not text:
+        return []
+    found = []
+    patterns = [
+        r'\(\s*\$?\s*(\d+(?:[\s.,]\d+)?)\s*(?:\$|dollar|usd)\s*\)',
+        r'\(\s*\$\s*(\d+(?:[\s.,]\d+)?)\s*\)',
+    ]
+    spans = []
+    for pat in patterns:
+        for m in re.finditer(pat, text, flags=re.IGNORECASE):
+            if any(not (m.end() <= s or m.start() >= e) for s, e in spans):
+                continue
+            spans.append((m.start(), m.end()))
+            try:
+                val = float(m.group(1).replace(" ", "").replace(",", "."))
+                if val > 0:
+                    found.append(val)
+            except ValueError:
+                pass
+    return found
+
+def _ensure_parenthesized_usd(records: List[Dict[str, Any]], text: str) -> Dict[str, Any]:
+    """Agar xabarda qavs ichida ($...) bo'lib, yozuvlarda USD sifatida tushmay qolgan bo'lsa,
+    bizga tushgan dollar (naqd yoki pul_keldi) sifatida qo'shadi."""
+    paren_usds = _extract_parenthesized_usd(text)
+    if not paren_usds:
+        return {"is_relevant": len(records) > 0, "records": records}
+
+    existing_usds = [
+        round(float(r.get("amount_usd") or 0), 2)
+        for r in records
+        if r.get("currency") == "USD" and (r.get("amount_usd") or 0) > 0
+    ]
+
+    # Qaysi toifaga biriktiramiz: mijozdan pul kelgan bo'lsa pul_keldi, aks holda naqd
+    lower = (text or "").lower()
+    is_pul = any(r.get("category") == "pul_keldi" for r in records) or any(
+        k in lower for k in ["pul keldi", "pul berdi", "berdi", "to'ladi", "toladi", "yopdi", "oplata"]
+    )
+    partner = next((r.get("partner_name") for r in records if r.get("partner_name")), None)
+    target_cat = "pul_keldi" if is_pul else "naqd"
+
+    for usd_val in paren_usds:
+        rounded_val = round(usd_val, 2)
+        if any(abs(ex - rounded_val) < 0.01 for ex in existing_usds):
+            continue
+        records.append({
+            "category": target_cat,
+            "item_name": "Dollar tushum ($)" if target_cat == "naqd" else None,
+            "quantity": None,
+            "unit": None,
+            "price": None,
+            "total_amount": None,
+            "partner_name": partner if target_cat == "pul_keldi" else None,
+            "currency": "USD",
+            "amount_usd": rounded_val,
+        })
+        existing_usds.append(rounded_val)
+
+    return {"is_relevant": len(records) > 0, "records": records}
 
 def _to_number(v) -> Optional[float]:
     if v is None or v == "":
@@ -345,7 +419,7 @@ def _to_number(v) -> Optional[float]:
     except (TypeError, ValueError):
         return None
 
-def _sanitize_ai_result(res: Dict[str, Any]) -> Dict[str, Any]:
+def _sanitize_ai_result(res: Dict[str, Any], original_text: str = "") -> Dict[str, Any]:
     """AI natijasini qat'iy tekshirish: noto'g'ri toifa/raqamlar tashlab yuboriladi,
     summa esa kod orqali qayta hisoblanadi."""
     clean = []
@@ -376,7 +450,17 @@ def _sanitize_ai_result(res: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(r.get("partner_name"), str):
             r["partner_name"] = r["partner_name"].strip() or None
         clean.append(r)
-    return {"is_relevant": bool(clean), "records": clean, "source": "ai"}
+    ensured = _ensure_parenthesized_usd(clean, original_text)
+    is_card = _has_card_marker(original_text)
+    for rec in ensured.get("records", []):
+        pm = str(rec.get("payment_method") or "").strip().lower()
+        if pm not in ("cash", "card"):
+            pm = "card" if is_card else "cash"
+        elif is_card and rec.get("category") in ("naqd", "pul_keldi") and rec.get("currency") != "USD":
+            pm = "card"
+        rec["payment_method"] = pm
+    ensured["source"] = "ai"
+    return ensured
 
 def analyze_message(text: str) -> Dict[str, Any]:
     """Asosiy tahlil funksiyasi"""
@@ -385,8 +469,12 @@ def analyze_message(text: str) -> Dict[str, Any]:
 
     res = parse_with_gemini(text)
     if res and isinstance(res, dict) and "records" in res:
-        return _sanitize_ai_result(res)
+        return _sanitize_ai_result(res, text)
 
     fb = fallback_regex_parser(text)
+    is_card = _has_card_marker(text)
+    for rec in fb.get("records", []):
+        if "payment_method" not in rec:
+            rec["payment_method"] = "card" if (is_card and rec.get("category") in ("naqd", "pul_keldi") and rec.get("currency") != "USD") else "cash"
     fb["source"] = "regex"
     return fb

@@ -169,6 +169,15 @@ function changePeriod(period) {
           usdLine.style.display = 'none';
         }
       }
+      const cardLine = document.getElementById('rec-card-line');
+      if (cardLine) {
+        if ((rec.today_card_uzs || 0) > 0) {
+          cardLine.style.display = 'block';
+          cardLine.innerText = `💳 Karta tushumi (naqddan ayrilgan): ${formatNumber(rec.today_card_uzs)} so'm`;
+        } else {
+          cardLine.style.display = 'none';
+        }
+      }
 
       if (data.chart || data.top_debtors) {
         ensureScript('https://cdn.jsdelivr.net/npm/chart.js').then(() => {
