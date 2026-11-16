@@ -48,6 +48,7 @@ Guruhdagi xabarlardan quyidagi 7 toifani ajratib, JSON formatida qaytarishing ke
 
 MUHIM QOIDALAR:
 - Narxlarni o'qishda: Agar valyuta UZS (so'm) bo'lsa va narx "170, 175, 180, 65, 320" kabi 1000 dan kichik sonlarda yozilgan bo'lsa, ularning orqasiga 3 ta nol qo'shib yoz (masalan: 170 -> 170000, 65 -> 65000)! Agar USD ($) bo'lsa 3 ta nol QO'SHMA (masalan: 50$ -> amount_usd: 50)!
+- Vergul qoidasi: Summa yoki dollar yozishda vergul (,) ishlatilsa, vergulni e'tiborsiz qoldirib olib tashla (masalan: 1,500$ -> 1500, 2,500,000 -> 2500000, (1,200$) -> 1200)!
 - Umumiy summa (total_amount) = quantity * price (agar ikkalasi mavjud bo'lsa).
 - "1.5 mln", "1,5 million" -> 1500000; "500 ming" -> 500000.
 - Agar summa yoki ism aniq tushunarsiz bo'lsa, o'zingdan to'qima: noma'lum maydonni null qoldir.
@@ -180,8 +181,8 @@ def fallback_regex_parser(text: str) -> Dict[str, Any]:
     if any(k in lower for k in ["qaytardi", "qaytarildi", "qaytib keldi", "vozvrat"]):
         qty_match = re.search(r'(\d+[\d\s.,]*)\s*(ta|dona|qop|kg|yashik|tonna|litr|metr|blok|pochka)', lower)
         price_match = re.search(r'(\d+[\d\s.,]*)\s*(dan|so\'m|som)', lower)
-        qty = float(qty_match.group(1).replace(" ", "").replace(",", ".")) if qty_match else None
-        price = float(price_match.group(1).replace(" ", "").replace(",", ".")) if price_match else None
+        qty = float(qty_match.group(1).replace(" ", "").replace(",", "")) if qty_match else None
+        price = float(price_match.group(1).replace(" ", "").replace(",", "")) if price_match else None
         if price and price < 1000:
             price *= 1000
         first_word = text.strip().split()[0]
@@ -197,7 +198,7 @@ def fallback_regex_parser(text: str) -> Dict[str, Any]:
     if any(k in lower for k in ["uyga ketyapti", "uyga ketdi", "uyga olib", "uyga"]):
         m = re.search(r'(\d+[\d\s.,]*)\s*(mln|million|ming|\$|dollar|usd)?', lower)
         is_usd = "$" in text or "dollar" in lower or "usd" in lower
-        amt = float(m.group(1).replace(" ", "").replace(",", ".")) if m else 0
+        amt = float(m.group(1).replace(" ", "").replace(",", "")) if m else 0
         unit_kw = (m.group(2) or "") if m else ""
         if not is_usd:
             if unit_kw in ("mln", "million"):
@@ -214,7 +215,7 @@ def fallback_regex_parser(text: str) -> Dict[str, Any]:
     if any(k in lower for k in ["rasxod", "rasxot", "xarajat", "chiqim"]):
         m = re.search(r'(\d+[\d\s.,]*)\s*(mln|million|ming|\$|dollar|usd)?', lower)
         is_usd = "$" in text or "dollar" in lower or "usd" in lower
-        amt = float(m.group(1).replace(" ", "").replace(",", ".")) if m else 0
+        amt = float(m.group(1).replace(" ", "").replace(",", "")) if m else 0
         unit_kw = (m.group(2) or "") if m else ""
         if not is_usd:
             if unit_kw in ("mln", "million"):
@@ -231,7 +232,7 @@ def fallback_regex_parser(text: str) -> Dict[str, Any]:
     if any(k in lower for k in ["naqd", "naxt"]) and not any(k in lower for k in ["nasiya", "qarzga"]):
         m = re.search(r'(\d+[\d\s.,]*)\s*(mln|million|ming|\$|dollar|usd)?', lower)
         is_usd = "$" in text or "dollar" in lower or "usd" in lower
-        amt = float(m.group(1).replace(" ", "").replace(",", ".")) if m else 0
+        amt = float(m.group(1).replace(" ", "").replace(",", "")) if m else 0
         unit_kw = (m.group(2) or "") if m else ""
         if not is_usd:
             if unit_kw in ("mln", "million"):
@@ -256,7 +257,7 @@ def fallback_regex_parser(text: str) -> Dict[str, Any]:
         if len(words) > 2 and not words[0].isdigit():
             partner_name = f"{words[0]} {words[1]}" if len(words) > 2 and words[1].lower() in ["aka", "uka", "opa", "aka.", "do'kon"] else words[0]
 
-        amt = float(usd_match.group(1).replace(" ", "").replace(",", ".")) if usd_match else 0
+        amt = float(usd_match.group(1).replace(" ", "").replace(",", "")) if usd_match else 0
         if is_usd:
             records.append({
                 "category": "pul_keldi",
@@ -287,7 +288,7 @@ def fallback_regex_parser(text: str) -> Dict[str, Any]:
     # 2. Kelim (Kirim)
     elif any(k in lower for k in ["kelim", "kirim", "keldi", "omborga kirdi", "tushdi", "fura"]):
         match = re.search(r'(\d+[\d\s.,]*)\s*(ta|dona|qop|kg|tonna|litr|metr|blok|pochka)?', lower)
-        qty = float(match.group(1).replace(" ", "").replace(",", ".")) if match else None
+        qty = float(match.group(1).replace(" ", "").replace(",", "")) if match else None
         records.append({
             "category": "kelim",
             "item_name": text[:50].strip(),
@@ -307,10 +308,10 @@ def fallback_regex_parser(text: str) -> Dict[str, Any]:
         qty_match = re.search(r'(\d+[\d\s.,]*)\s*(ta|dona|qop|kg|tonna|litr|metr|blok|pochka)', lower)
         price_match = re.search(r'(\d+[\d\s.,]*)\s*(dan|so\'m|som)', lower)
 
-        qty = float(qty_match.group(1).replace(" ", "").replace(",", ".")) if qty_match else 1
+        qty = float(qty_match.group(1).replace(" ", "").replace(",", "")) if qty_match else 1
         unit = qty_match.group(2) if qty_match else "ta"
         
-        price = float(price_match.group(1).replace(" ", "").replace(",", ".")) if price_match else None
+        price = float(price_match.group(1).replace(" ", "").replace(",", "")) if price_match else None
         if price and price < 1000:
             price = price * 1000
 
@@ -364,7 +365,7 @@ def _extract_parenthesized_usd(text: str) -> List[float]:
                 continue
             spans.append((m.start(), m.end()))
             try:
-                val = float(m.group(1).replace(" ", "").replace(",", "."))
+                val = float(m.group(1).replace(" ", "").replace(",", ""))
                 if val > 0:
                     found.append(val)
             except ValueError:
@@ -415,7 +416,7 @@ def _to_number(v) -> Optional[float]:
     if v is None or v == "":
         return None
     try:
-        return float(str(v).replace(" ", "").replace(",", "."))
+        return float(str(v).replace(" ", "").replace(",", ""))
     except (TypeError, ValueError):
         return None
 
