@@ -448,7 +448,7 @@
   </nav>
 
   <!-- JAVASCRIPT: INSTANT RENDER & ULTRA FAST LOGIC -->
-  <script src="/static/js/app.js?v=5" defer></script>
+  <script src="/static/js/app.js?v=6" defer></script>
 
   <!-- FLOATING AI VOICE ASSISTANT BUTTON -->
   <button onclick="openAiModal()" title="Ovozli AI Yordamchi" style="position:fixed; right:16px; bottom:116px; z-index:45; display:flex; align-items:center; gap:6px; padding:8px 13px; border-radius:999px; background:linear-gradient(135deg,#A855F7,#00F2FE); border:none; color:#06090F; font-weight:900; font-size:11px; cursor:pointer; box-shadow:0 4px 18px rgba(168,85,247,0.45);">
@@ -477,6 +477,12 @@
         <button onclick="closeAiModal()" class="modal-close-btn">&times;</button>
       </div>
       <div class="modal-body" style="padding-top:8px;">
+        <!-- GEMINI LIVE VOICE ORB -->
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:10px;">
+          <button id="ai-live-orb" onclick="onOrbTap()" title="Gapirish / To'xtatish" style="width:62px; height:62px; border-radius:50%; border:none; background:radial-gradient(circle,#A855F7,#0F172A); box-shadow:0 0 14px rgba(168,85,247,0.35); cursor:pointer; font-size:24px; color:#FFF; transition:all 0.25s ease;">🎙</button>
+          <button id="ai-live-btn" onclick="toggleAiLiveMode()" style="padding:6px 14px; border-radius:999px; border:none; background:linear-gradient(135deg,#A855F7,#00F2FE); color:#06090F; font-weight:900; font-size:11px; cursor:pointer;">🎙 Jonli Suhbat (Gemini Live)</button>
+        </div>
+
         <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
           <button onclick="sendAiQuestion('Bugungi savdo qancha bo\'ldi?')" style="font-size:10px; padding:5px 9px; border-radius:999px; background:rgba(0,242,254,0.1); border:1px solid rgba(0,242,254,0.25); color:#00F2FE; cursor:pointer; font-weight:700;">Bugungi savdo?</button>
           <button onclick="sendAiQuestion('Kassada qancha pul qoldi?')" style="font-size:10px; padding:5px 9px; border-radius:999px; background:rgba(0,245,160,0.1); border:1px solid rgba(0,245,160,0.25); color:#00F5A0; cursor:pointer; font-weight:700;">Kassa holati?</button>

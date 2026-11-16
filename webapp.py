@@ -29,7 +29,7 @@ from database import (
     get_now,
     health_check as db_health_check
 )
-from ai_parser import answer_business_question, answer_business_audio_question
+from ai_parser import answer_business_question, answer_business_audio_question, synthesize_uzbek_speech_b64
 from excel_export import create_excel_report
 from currency import get_usd_rate
 
@@ -483,13 +483,20 @@ def api_ai_ask():
             audio_file = request.files["audio"]
             audio_bytes = audio_file.read()
             mime = audio_file.mimetype or "audio/webm"
-            ai_res = answer_business_audio_question(audio_bytes, mime, context)
+            try:
+                history = json.loads(request.form.get("history") or "[]")
+            except Exception:
+                history = []
+            want_voice = request.form.get("want_voice", "true").lower() == "true"
+            ai_res = answer_business_audio_question(audio_bytes, mime, context, history=history)
         else:
             payload = request.get_json(silent=True) or {}
             question = (payload.get("question") or "").strip()
             if not question:
                 return jsonify({"error": "Savol kiritilmadi"}), 400
-            ai_res = answer_business_question(question, context)
+            history = payload.get("history") if isinstance(payload.get("history"), list) else []
+            want_voice = bool(payload.get("want_voice", True))
+            ai_res = answer_business_question(question, context, history=history)
 
         action = ai_res.get("action") or "answer"
         rec_id = ai_res.get("record_id")
@@ -511,12 +518,16 @@ def api_ai_ask():
             else:
                 answer = f"⚠️ #{rec_id}-yozuvni tahrirlab bo'lmadi."
 
+        final_answer = answer or "Bajarildi."
+        audio_b64 = synthesize_uzbek_speech_b64(final_answer) if want_voice else None
+
         return jsonify({
             "success": True,
             "question": ai_res.get("question") or "",
             "action": action,
             "mutated": mutated,
-            "answer": answer or "Bajarildi."
+            "answer": final_answer,
+            "audio_b64": audio_b64,
         })
     except Exception as e:
         logger.error(f"AI ask xatoligi: {e}")

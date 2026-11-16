@@ -568,8 +568,8 @@ def _fallback_action_or_answer(question: str, context: Dict[str, Any]) -> Dict[s
             return {"question": question, "action": "delete_record", "record_id": target_id, "updates": None, "answer": ""}
     return {"question": question, "action": "answer", "record_id": None, "updates": None, "answer": _fallback_business_answer(question, context)}
 
-def answer_business_question(question: str, context: Dict[str, Any]) -> Dict[str, Any]:
-    """Mini App ichidagi savol yoki admin buyrug'ini (o'chirish/tahrirlash/javob) tahlil qiladi"""
+def answer_business_question(question: str, context: Dict[str, Any], history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+    """Mini App ichidagi savol yoki admin buyrug'ini (ko'p bosqichli suhbat tarixi bilan) tahlil qiladi"""
     if not question or not question.strip():
         return {"question": "", "action": "answer", "record_id": None, "updates": None, "answer": "Savolingizni yozing yoki mikrofonni bosib gapiring."}
     if not GEMINI_API_KEY:
@@ -577,20 +577,28 @@ def answer_business_question(question: str, context: Dict[str, Any]) -> Dict[str
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     system_txt = (
-        "Sen MMM Analytics aqlli admin yordamchisisiz. Faqat o'zbek tilida gapir. "
+        "Sen MMM Analytics aqlli ovozli biznes yordamchisisiz (xuddi Gemini Live kabi jonli suhbatdosh). "
+        "Faqat o'zbek tilida, tabiiy, samimiy va jonli nutqqa mos qilib qisqa gapir (yulduzcha ** yoki murakkab belgilar ishlatma). "
         "Kontekstda `recent_records` (oxirgi yozuvlar `id` si bilan) va savdo/kassa/qarz raqamlari bor. "
+        "Oldingi suhbat tarixini ham inobatga ol ('uni o'chir', 'o'sha mijoz' kabi murojaatlarni tushun). "
         "Foydalanuvchi savol bersa action='answer' qilib, faqat real raqamlarga tayanib qisqa javob yoz. "
-        "Agar foydalanuvchi aniq bir yozuvni O'CHIRISHNI aytsa ('#12 ni o'chir', 'oxirgi yozuvni o'chirib tashla'): "
-        "action='delete_record', record_id=<topilgan id> qaytar. "
-        "Agar foydalanuvchi aniq bir yozuvni TAHRIRLASHNI aytsa ('#12 summasini 500 ming qil', 'oxirgi yozuvda mijozni Ali qil'): "
-        "action='edit_record', record_id=<topilgan id>, updates={...} (faqat: category, item_name, quantity, unit, price, total_amount, partner_name, currency, amount_usd, payment_method) qaytar. "
+        "Agar foydalanuvchi aniq bir yozuvni O'CHIRISHNI aytsa: action='delete_record', record_id=<id>. "
+        "Agar foydalanuvchi aniq bir yozuvni TAHRIRLASHNI aytsa: action='edit_record', record_id=<id>, updates={...} "
+        "(faqat: category, item_name, quantity, unit, price, total_amount, partner_name, currency, amount_usd, payment_method). "
         'FAQAT JSON qaytar: {"action": "answer|delete_record|edit_record", "record_id": null, "updates": null, "answer": "..."}'
     )
     compact_ctx = json.dumps(context, ensure_ascii=False, default=str)[:14000]
+    contents = []
+    for turn in (history or [])[-8:]:
+        role = "model" if turn.get("role") == "ai" else "user"
+        txt = str(turn.get("text") or "").strip()
+        if txt:
+            contents.append({"role": role, "parts": [{"text": txt}]})
+    contents.append({"role": "user", "parts": [{"text": f"Baza ma'lumotlari:\n{compact_ctx}\n\nFoydalanuvchi: {question}"}]})
     payload = {
         "system_instruction": {"parts": [{"text": system_txt}]},
-        "contents": [{"role": "user", "parts": [{"text": f"Baza ma'lumotlari:\n{compact_ctx}\n\nBuyruq/Savol: {question}"}]}],
-        "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json", "maxOutputTokens": 500},
+        "contents": contents,
+        "generationConfig": {"temperature": 0.25, "responseMimeType": "application/json", "maxOutputTokens": 500},
     }
     try:
         req = urllib.request.Request(
@@ -614,25 +622,27 @@ def answer_business_question(question: str, context: Dict[str, Any]) -> Dict[str
         logger.warning(f"AI savol-javob xatoligi (fallback ishlatildi): {e}")
     return _fallback_action_or_answer(question, context)
 
-def answer_business_audio_question(audio_bytes: bytes, mime_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
-    """Mini App mikrofonidan yuborilgan ovozni eshitib, savol/buyruq va javobni qaytaradi"""
+def answer_business_audio_question(audio_bytes: bytes, mime_type: str, context: Dict[str, Any], history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+    """Mini App mikrofonidan yuborilgan ovozni eshitib, suhbat tarixi bilan savol/buyruq va javobni qaytaradi"""
     if not GEMINI_API_KEY:
         return {"question": "🎙 Ovozli savol", "action": "answer", "record_id": None, "updates": None, "answer": _fallback_business_answer("bugungi savdo", context)}
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
     compact_ctx = json.dumps(context, ensure_ascii=False, default=str)[:14000]
+    hist_lines = "\n".join(f"{t.get('role','user')}: {t.get('text','')}" for t in (history or [])[-6:])
     prompt = (
-        "Foydalanuvchining o'zbekcha ovozli savolini yoki admin buyrug'ini eshit (o'chirish/tahrirlash ham bo'lishi mumkin) va quyidagi baza ma'lumotlariga tayan.\n"
-        f"Baza:\n{compact_ctx}\n\n"
-        'FAQAT JSON qaytar: {"question": "eshitilgan matn", "action": "answer|delete_record|edit_record", "record_id": null, "updates": null, "answer": "o\'zbekcha javob"}'
+        "Sen jonli o'zbekcha ovozli yordamchisan (yulduzcha ** ishlatma, tabiiy gapir). "
+        "Foydalanuvchining ovozli savolini yoki admin buyrug'ini eshit (o'chirish/tahrirlash ham bo'lishi mumkin).\n"
+        f"Oldingi suhbat:\n{hist_lines}\n\nBaza:\n{compact_ctx}\n\n"
+        'FAQAT JSON qaytar: {"question": "eshitilgan matn", "action": "answer|delete_record|edit_record", "record_id": null, "updates": null, "answer": "o\'zbekcha jonli javob"}'
     )
     payload = {
         "contents": [{"role": "user", "parts": [
             {"text": prompt},
             {"inline_data": {"mime_type": mime_type or "audio/webm", "data": b64_audio}}
         ]}],
-        "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json", "maxOutputTokens": 550},
+        "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json", "maxOutputTokens": 550},
     }
     try:
         req = urllib.request.Request(
@@ -655,3 +665,27 @@ def answer_business_audio_question(audio_bytes: bytes, mime_type: str, context: 
     except Exception as e:
         logger.warning(f"Audio AI savol xatoligi: {e}")
         return {"question": "🎙 Ovozli savol", "action": "answer", "record_id": None, "updates": None, "answer": _fallback_business_answer("bugungi savdo", context)}
+
+def synthesize_uzbek_speech_b64(text: str, voice: str = "uz-UZ-SardorNeural") -> Optional[str]:
+    """Matnni tabiiy o'zbek ovoziga (MP3 base64) aylantiradi"""
+    clean = re.sub(r'[*_`#•]', '', text or '').strip()
+    if not clean:
+        return None
+    try:
+        import asyncio
+        import edge_tts
+
+        async def _gen():
+            comm = edge_tts.Communicate(clean[:900], voice)
+            chunks = []
+            async for ch in comm.stream():
+                if ch["type"] == "audio":
+                    chunks.append(ch["data"])
+            return b"".join(chunks)
+
+        audio_bytes = asyncio.run(_gen())
+        if audio_bytes:
+            return base64.b64encode(audio_bytes).decode("ascii")
+    except Exception as e:
+        logger.debug(f"TTS ovoz yaratishda ogohlantirish: {e}")
+    return None
