@@ -448,7 +448,13 @@
   </nav>
 
   <!-- JAVASCRIPT: INSTANT RENDER & ULTRA FAST LOGIC -->
-  <script src="/static/js/app.js?v=4" defer></script>
+  <script src="/static/js/app.js?v=5" defer></script>
+
+  <!-- FLOATING AI VOICE ASSISTANT BUTTON -->
+  <button onclick="openAiModal()" title="Ovozli AI Yordamchi" style="position:fixed; right:16px; bottom:116px; z-index:45; display:flex; align-items:center; gap:6px; padding:8px 13px; border-radius:999px; background:linear-gradient(135deg,#A855F7,#00F2FE); border:none; color:#06090F; font-weight:900; font-size:11px; cursor:pointer; box-shadow:0 4px 18px rgba(168,85,247,0.45);">
+    <span style="font-size:14px;">🤖</span>
+    <span>AI</span>
+  </button>
 
   <!-- FLOATING SUPPORT BUTTON (BURCHAKDA IXCHAM) -->
   <button onclick="openSupportModal()" class="support-floating-btn" title="Tezkor Yordam & Support">
@@ -456,6 +462,45 @@
     <span>Yordam</span>
     <span class="support-pulse"></span>
   </button>
+
+  <!-- AI VOICE ASSISTANT MODAL -->
+  <div id="ai-modal" class="modal-backdrop" onclick="closeAiModal(event)">
+    <div class="modal-dialog glass-card glow-purple" onclick="event.stopPropagation()" style="max-width:440px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:22px;">🤖</span>
+          <div>
+            <div style="font-size:14px; font-weight:900; color:#FFF;">Ovozli AI Biznes Yordamchi</div>
+            <div id="ai-voice-status" style="font-size:10px; color:#00F2FE;">Tayyor — yozing yoki mikrofonni bosing</div>
+          </div>
+        </div>
+        <button onclick="closeAiModal()" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body" style="padding-top:8px;">
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+          <button onclick="sendAiQuestion('Bugungi savdo qancha bo\'ldi?')" style="font-size:10px; padding:5px 9px; border-radius:999px; background:rgba(0,242,254,0.1); border:1px solid rgba(0,242,254,0.25); color:#00F2FE; cursor:pointer; font-weight:700;">Bugungi savdo?</button>
+          <button onclick="sendAiQuestion('Kassada qancha pul qoldi?')" style="font-size:10px; padding:5px 9px; border-radius:999px; background:rgba(0,245,160,0.1); border:1px solid rgba(0,245,160,0.25); color:#00F5A0; cursor:pointer; font-weight:700;">Kassa holati?</button>
+          <button onclick="sendAiQuestion('Eng katta qarzdorlar kim?')" style="font-size:10px; padding:5px 9px; border-radius:999px; background:rgba(255,51,102,0.1); border:1px solid rgba(255,51,102,0.25); color:#FF3366; cursor:pointer; font-weight:700;">Qarzdorlar?</button>
+          <button onclick="sendAiQuestion('Kechagi savdo qancha edi?')" style="font-size:10px; padding:5px 9px; border-radius:999px; background:rgba(168,85,247,0.12); border:1px solid rgba(168,85,247,0.3); color:#D8B4FE; cursor:pointer; font-weight:700;">Kechagi savdo?</button>
+        </div>
+
+        <div id="ai-chat-box" style="display:flex; flex-direction:column; gap:8px; height:210px; overflow-y:auto; padding:10px; background:#0B111E; border:1px solid rgba(255,255,255,0.08); border-radius:12px; margin-bottom:10px;">
+          <div style="align-self:flex-start; max-width:88%; padding:9px 12px; border-radius:12px; font-size:12px; background:rgba(255,255,255,0.06); color:#E2E8F0; border:1px solid rgba(255,255,255,0.08);">
+            Assalomu alaykum! Mikrofonni bosib savol bering (masalan: <i>"Bugungi savdo qancha bo'ldi?"</i> yoki <i>"Suxrobning qarzi qancha?"</i>).
+          </div>
+        </div>
+
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button id="ai-mic-btn" onclick="toggleAiVoice()" title="Ovoz bilan so'rash" style="width:40px; height:38px; border-radius:10px; border:none; background:linear-gradient(135deg,#A855F7,#00F2FE); color:#06090F; font-size:16px; cursor:pointer; flex-shrink:0;">🎙</button>
+          <input type="text" id="ai-question-input" placeholder="Savol yozing..." onkeydown="if(event.key==='Enter')sendAiQuestion()" style="flex:1; background:#0B111E; border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:9px 11px; color:#FFF; font-size:12px; outline:none;">
+          <button onclick="sendAiQuestion()" style="padding:9px 13px; border-radius:10px; border:none; background:#00F5A0; color:#06090F; font-weight:900; font-size:12px; cursor:pointer; flex-shrink:0;">➤</button>
+        </div>
+        <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:10px; color:#94A3B8; cursor:pointer;">
+          <input type="checkbox" id="ai-tts-toggle" checked> Javobni ovozda o'qib berish
+        </label>
+      </div>
+    </div>
+  </div>
 
   <!-- SUPPORT MODAL (IXCHAM YORDAM OYNASI) -->
   <div id="support-modal" class="modal-backdrop" onclick="closeSupportModal(event)">

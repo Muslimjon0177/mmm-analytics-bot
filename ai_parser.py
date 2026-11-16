@@ -478,3 +478,180 @@ def analyze_message(text: str) -> Dict[str, Any]:
             rec["payment_method"] = "card" if (is_card and rec.get("category") in ("naqd", "pul_keldi") and rec.get("currency") != "USD") else "cash"
     fb["source"] = "regex"
     return fb
+
+def _fmt_uzs(v: Any) -> str:
+    try:
+        return f"{int(round(float(v or 0))):,}".replace(",", " ")
+    except Exception:
+        return "0"
+
+def _fallback_business_answer(question: str, context: Dict[str, Any]) -> str:
+    """Gemini ishlamaganda ham real baza raqamlaridan aniq o'zbekcha javob qaytaradi"""
+    q = (question or "").lower()
+    today = context.get("today") or {}
+    yest = context.get("yesterday") or {}
+    rec = today.get("reconciliation") or {}
+    customers = context.get("customers") or []
+
+    # 1. Mijoz ismi bo'yicha qarz qidirish (transliteratsiya/fuzzy orqali)
+    if customers:
+        try:
+            from customer_matcher import normalize_text, strip_honorifics_and_suffixes
+            q_norm = strip_honorifics_and_suffixes(normalize_text(q))
+            q_tokens = [t for t in q_norm.split() if len(t) >= 3]
+            matched = []
+            for c in customers:
+                cname = c.get("display_name") or c.get("name") or ""
+                c_norm = strip_honorifics_and_suffixes(normalize_text(cname))
+                if c_norm and (c_norm in q_norm or any(tok in c_norm.split() for tok in q_tokens)):
+                    matched.append(c)
+            if matched and any(k in q for k in ("qarz", "hisob", "qancha", "berdi", "oldi", "balans")):
+                lines = []
+                for c in matched[:4]:
+                    bal = float(c.get("current_balance") or 0)
+                    status = f"qarzi {_fmt_uzs(bal)} so'm" if bal > 0 else "qarzi yo'q (hisob yopiq)"
+                    lines.append(f"• {c.get('display_name')}: {status}")
+                return "\n".join(lines)
+        except Exception:
+            pass
+
+    # 2. Kechagi savdo
+    if "kecha" in q:
+        naqd = yest.get("naqd") or {}
+        nasiya = yest.get("nasiya") or {}
+        pul = yest.get("pul_keldi") or {}
+        return (
+            f"📅 Kechagi hisobot ({yest.get('date', '')}):\n"
+            f"• Naqd savdo: {_fmt_uzs(naqd.get('total_sum'))} so'm (${_fmt_uzs(naqd.get('total_usd'))})\n"
+            f"• Nasiya savdo: {_fmt_uzs(nasiya.get('total_sum'))} so'm\n"
+            f"• Pul keldi: {_fmt_uzs(pul.get('total_sum'))} so'm"
+        )
+
+    # 3. Kassa / uyga / rasxod / ostatka
+    if any(k in q for k in ("kassa", "uyga", "rasxod", "rasxot", "ostatka", "qoldi", "farq", "karta")):
+        return (
+            f"⚖️ Bugungi kassa holati:\n"
+            f"• Sof so'm kassada bo'lishi kerak: {_fmt_uzs(rec.get('expected_uzs'))} so'm\n"
+            f"• Dollar kassa: ${_fmt_uzs(rec.get('expected_usd'))}\n"
+            f"• Karta tushumi (alohida): {_fmt_uzs(rec.get('today_card_uzs'))} so'm\n"
+            f"• Rasxod: {_fmt_uzs(rec.get('today_rasxod_uzs'))} so'm | Uyga: {_fmt_uzs(rec.get('today_uyga_uzs'))} so'm"
+        )
+
+    # 4. Eng yirik qarzdorlar
+    if "qarzdor" in q or ("qarz" in q and "kim" in q):
+        top = today.get("top_debtors") or []
+        if not top:
+            return "Hozirda qarzdor mijozlar yo'q."
+        lines = [f"• {d.get('name')}: {_fmt_uzs(d.get('balance'))} so'm" for d in top[:5]]
+        return "🔴 Eng yirik qarzdorlar:\n" + "\n".join(lines)
+
+    # 5. Umumiy bugungi savdo
+    naqd = today.get("naqd") or {}
+    nasiya = today.get("nasiya") or {}
+    pul = today.get("pul_keldi") or {}
+    return (
+        f"📊 Bugungi savdo:\n"
+        f"• Naqd: {naqd.get('count', 0)} ta — {_fmt_uzs(naqd.get('total_sum'))} so'm (${_fmt_uzs(naqd.get('total_usd'))})\n"
+        f"• Nasiya: {nasiya.get('count', 0)} ta — {_fmt_uzs(nasiya.get('total_sum'))} so'm\n"
+        f"• Pul keldi: {pul.get('count', 0)} ta — {_fmt_uzs(pul.get('total_sum'))} so'm\n"
+        f"• Kassada bo'lishi kerak: {_fmt_uzs(rec.get('expected_uzs'))} so'm (${_fmt_uzs(rec.get('expected_usd'))})"
+    )
+
+def _fallback_action_or_answer(question: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    """Offline/zaxira rejimda ham savollarga javob beradi va aniq o'chirish buyruqlarini taniydi"""
+    q = (question or "").lower()
+    recs = context.get("recent_records") or []
+    if any(k in q for k in ("o'chir", "ochir", "olib tashla", "delete", "bekor qil")):
+        m = re.search(r'#?(\d+)', q)
+        target_id = int(m.group(1)) if m else (recs[0]["id"] if ("oxirgi" in q or "so'nggi" in q or "songgi" in q) and recs else None)
+        if target_id:
+            return {"question": question, "action": "delete_record", "record_id": target_id, "updates": None, "answer": ""}
+    return {"question": question, "action": "answer", "record_id": None, "updates": None, "answer": _fallback_business_answer(question, context)}
+
+def answer_business_question(question: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    """Mini App ichidagi savol yoki admin buyrug'ini (o'chirish/tahrirlash/javob) tahlil qiladi"""
+    if not question or not question.strip():
+        return {"question": "", "action": "answer", "record_id": None, "updates": None, "answer": "Savolingizni yozing yoki mikrofonni bosib gapiring."}
+    if not GEMINI_API_KEY:
+        return _fallback_action_or_answer(question, context)
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+    system_txt = (
+        "Sen MMM Analytics aqlli admin yordamchisisiz. Faqat o'zbek tilida gapir. "
+        "Kontekstda `recent_records` (oxirgi yozuvlar `id` si bilan) va savdo/kassa/qarz raqamlari bor. "
+        "Foydalanuvchi savol bersa action='answer' qilib, faqat real raqamlarga tayanib qisqa javob yoz. "
+        "Agar foydalanuvchi aniq bir yozuvni O'CHIRISHNI aytsa ('#12 ni o'chir', 'oxirgi yozuvni o'chirib tashla'): "
+        "action='delete_record', record_id=<topilgan id> qaytar. "
+        "Agar foydalanuvchi aniq bir yozuvni TAHRIRLASHNI aytsa ('#12 summasini 500 ming qil', 'oxirgi yozuvda mijozni Ali qil'): "
+        "action='edit_record', record_id=<topilgan id>, updates={...} (faqat: category, item_name, quantity, unit, price, total_amount, partner_name, currency, amount_usd, payment_method) qaytar. "
+        'FAQAT JSON qaytar: {"action": "answer|delete_record|edit_record", "record_id": null, "updates": null, "answer": "..."}'
+    )
+    compact_ctx = json.dumps(context, ensure_ascii=False, default=str)[:14000]
+    payload = {
+        "system_instruction": {"parts": [{"text": system_txt}]},
+        "contents": [{"role": "user", "parts": [{"text": f"Baza ma'lumotlari:\n{compact_ctx}\n\nBuyruq/Savol: {question}"}]}],
+        "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json", "maxOutputTokens": 500},
+    }
+    try:
+        req = urllib.request.Request(
+            url, data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"}, method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            parsed = json.loads(data["candidates"][0]["content"]["parts"][0]["text"])
+            act = parsed.get("action") or "answer"
+            if act not in ("answer", "delete_record", "edit_record"):
+                act = "answer"
+            return {
+                "question": question,
+                "action": act,
+                "record_id": int(parsed["record_id"]) if parsed.get("record_id") else None,
+                "updates": parsed.get("updates") if isinstance(parsed.get("updates"), dict) else None,
+                "answer": str(parsed.get("answer") or ""),
+            }
+    except Exception as e:
+        logger.warning(f"AI savol-javob xatoligi (fallback ishlatildi): {e}")
+    return _fallback_action_or_answer(question, context)
+
+def answer_business_audio_question(audio_bytes: bytes, mime_type: str, context: Dict[str, Any]) -> Dict[str, Any]:
+    """Mini App mikrofonidan yuborilgan ovozni eshitib, savol/buyruq va javobni qaytaradi"""
+    if not GEMINI_API_KEY:
+        return {"question": "🎙 Ovozli savol", "action": "answer", "record_id": None, "updates": None, "answer": _fallback_business_answer("bugungi savdo", context)}
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+    b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+    compact_ctx = json.dumps(context, ensure_ascii=False, default=str)[:14000]
+    prompt = (
+        "Foydalanuvchining o'zbekcha ovozli savolini yoki admin buyrug'ini eshit (o'chirish/tahrirlash ham bo'lishi mumkin) va quyidagi baza ma'lumotlariga tayan.\n"
+        f"Baza:\n{compact_ctx}\n\n"
+        'FAQAT JSON qaytar: {"question": "eshitilgan matn", "action": "answer|delete_record|edit_record", "record_id": null, "updates": null, "answer": "o\'zbekcha javob"}'
+    )
+    payload = {
+        "contents": [{"role": "user", "parts": [
+            {"text": prompt},
+            {"inline_data": {"mime_type": mime_type or "audio/webm", "data": b64_audio}}
+        ]}],
+        "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json", "maxOutputTokens": 550},
+    }
+    try:
+        req = urllib.request.Request(
+            url, data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"}, method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            parsed = json.loads(data["candidates"][0]["content"]["parts"][0]["text"])
+            act = parsed.get("action") or "answer"
+            if act not in ("answer", "delete_record", "edit_record"):
+                act = "answer"
+            return {
+                "question": str(parsed.get("question") or "🎙 Ovozli savol"),
+                "action": act,
+                "record_id": int(parsed["record_id"]) if parsed.get("record_id") else None,
+                "updates": parsed.get("updates") if isinstance(parsed.get("updates"), dict) else None,
+                "answer": str(parsed.get("answer") or _fallback_business_answer("bugungi savdo", context)),
+            }
+    except Exception as e:
+        logger.warning(f"Audio AI savol xatoligi: {e}")
+        return {"question": "🎙 Ovozli savol", "action": "answer", "record_id": None, "updates": None, "answer": _fallback_business_answer("bugungi savdo", context)}

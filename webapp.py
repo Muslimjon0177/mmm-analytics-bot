@@ -9,22 +9,27 @@ import threading
 from collections import defaultdict
 from typing import Optional
 from urllib.parse import parse_qsl
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from flask import Flask, jsonify, request, send_from_directory, send_file
 import telebot
 from config import WEB_APP_PORT, BOT_MODE, WEBHOOK_SECRET, ENVIRONMENT, ADMIN_IDS, BOT_TOKEN
 from database import (
     get_advanced_stats,
+    get_daily_summary,
     get_filtered_records,
     get_all_customers,
     get_customer_detail,
     save_record,
+    delete_record_by_id,
+    update_record_by_id,
     get_all_records_for_export,
     get_all_settings,
     set_setting,
     is_module_enabled,
+    get_now,
     health_check as db_health_check
 )
+from ai_parser import answer_business_question, answer_business_audio_question
 from excel_export import create_excel_report
 from currency import get_usd_rate
 
@@ -459,6 +464,64 @@ def terms_of_service():
     <h2>3. Aloqa</h2><p>Texnik yordam va ulanish masalalari bo'yicha: <a href="https://t.me/fbr_a">@fbr_a</a></p></div></body></html>"""
     return html_doc, 200, {"Content-Type": "text/html; charset=utf-8"}
 
+@app.route("/api/ai-ask", methods=["POST"])
+def api_ai_ask():
+    """Mini App ichidagi ovozli va matnli AI biznes yordamchi (faqat admin)"""
+    if not is_admin_request(request):
+        return jsonify({"error": "Ushbu funksiya faqat biznes egasi (admin) uchun."}), 403
+    try:
+        now = get_now()
+        today_str = now.strftime("%Y-%m-%d")
+        yest_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        context = {
+            "today": get_daily_summary(today_str),
+            "yesterday": get_daily_summary(yest_str),
+            "customers": get_all_customers(order_by="debt")[:40],
+            "recent_records": get_filtered_records(limit=15),
+        }
+        if "audio" in request.files:
+            audio_file = request.files["audio"]
+            audio_bytes = audio_file.read()
+            mime = audio_file.mimetype or "audio/webm"
+            ai_res = answer_business_audio_question(audio_bytes, mime, context)
+        else:
+            payload = request.get_json(silent=True) or {}
+            question = (payload.get("question") or "").strip()
+            if not question:
+                return jsonify({"error": "Savol kiritilmadi"}), 400
+            ai_res = answer_business_question(question, context)
+
+        action = ai_res.get("action") or "answer"
+        rec_id = ai_res.get("record_id")
+        mutated = False
+        answer = ai_res.get("answer") or ""
+
+        if action == "delete_record" and rec_id:
+            deleted = delete_record_by_id(int(rec_id))
+            if deleted:
+                mutated = True
+                answer = f"🗑 #{rec_id}-yozuv ({deleted.get('partner_name') or deleted.get('item_name') or deleted.get('category')}) bazadan o'chirildi va balans qayta hisoblandi."
+            else:
+                answer = f"⚠️ #{rec_id}-yozuv topilmadi."
+        elif action == "edit_record" and rec_id and ai_res.get("updates"):
+            updated = update_record_by_id(int(rec_id), ai_res["updates"])
+            if updated:
+                mutated = True
+                answer = f"✏️ #{rec_id}-yozuv muvaffaqiyatli tahrirlandi va balans yangilandi."
+            else:
+                answer = f"⚠️ #{rec_id}-yozuvni tahrirlab bo'lmadi."
+
+        return jsonify({
+            "success": True,
+            "question": ai_res.get("question") or "",
+            "action": action,
+            "mutated": mutated,
+            "answer": answer or "Bajarildi."
+        })
+    except Exception as e:
+        logger.error(f"AI ask xatoligi: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.after_request
 def add_cache_headers(response):
     if request.path.startswith("/static") or request.path == "/":
@@ -468,7 +531,7 @@ def add_cache_headers(response):
     # Xavfsizlik sarlavhalari (Security Headers)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(self), camera=()"
     response.headers["Content-Security-Policy"] = "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org;"
     if ENVIRONMENT == "production" or request.is_secure:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

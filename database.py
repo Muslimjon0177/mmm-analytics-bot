@@ -650,6 +650,62 @@ def reassign_message_partner(chat_id: int, message_id: int, new_partner: str):
         recalculate_customer_balance(p)
     recalculate_customer_balance(new_partner)
 
+def delete_record_by_id(record_id: int) -> Optional[Dict[str, Any]]:
+    """ID bo'yicha bitta yozuvni o'chiradi va mijoz balansini qayta hisoblaydi"""
+    client = get_client()
+    deleted = None
+    try:
+        res = client.execute("SELECT * FROM records WHERE id = ?", [record_id])
+        if not res.rows:
+            return None
+        deleted = row_to_dict(res.columns, res.rows[0])
+        client.execute("DELETE FROM records WHERE id = ?", [record_id])
+    finally:
+        client.close()
+    if deleted and deleted.get("partner_name"):
+        recalculate_customer_balance(deleted["partner_name"])
+    try:
+        trigger_cloud_sync_async()
+    except Exception:
+        pass
+    return deleted
+
+def update_record_by_id(record_id: int, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """ID bo'yicha yozuvni tahrirlaydi va mijoz balansini qayta hisoblaydi"""
+    allowed = {"category", "item_name", "quantity", "unit", "price", "total_amount", "partner_name", "currency", "amount_usd", "payment_method"}
+    clean = {k: v for k, v in (updates or {}).items() if k in allowed}
+    if not clean:
+        return None
+    client = get_client()
+    old_row = None
+    updated_row = None
+    try:
+        res = client.execute("SELECT * FROM records WHERE id = ?", [record_id])
+        if not res.rows:
+            return None
+        old_row = row_to_dict(res.columns, res.rows[0])
+        merged = dict(old_row)
+        merged.update(clean)
+        if merged.get("quantity") and merged.get("price") and "total_amount" not in clean:
+            merged["total_amount"] = round(float(merged["quantity"]) * float(merged["price"]), 2)
+            clean["total_amount"] = merged["total_amount"]
+        set_sql = ", ".join(f"{k} = ?" for k in clean.keys())
+        params = list(clean.values()) + [record_id]
+        client.execute(f"UPDATE records SET {set_sql} WHERE id = ?", params)
+        res2 = client.execute("SELECT * FROM records WHERE id = ?", [record_id])
+        if res2.rows:
+            updated_row = row_to_dict(res2.columns, res2.rows[0])
+    finally:
+        client.close()
+    for p in {old_row.get("partner_name") if old_row else None, updated_row.get("partner_name") if updated_row else None}:
+        if p:
+            recalculate_customer_balance(p)
+    try:
+        trigger_cloud_sync_async()
+    except Exception:
+        pass
+    return updated_row
+
 def _query_day_metrics(client, date_str: str) -> Dict[str, Any]:
     """Bir kunlik barcha toifalar (sof so'm naqd, karta, dollar va dollarning so'm ekvivalenti ajratilgan holda)"""
     res = client.execute("""
