@@ -39,8 +39,12 @@ TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "").strip()
 TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "").strip()
 DB_PATH = os.getenv("DB_PATH", str(BASE_DIR / "warehouse.db")).strip()
 
-# Bot Execution Mode: 'polling' (default) or 'webhook'
-BOT_MODE = os.getenv("BOT_MODE", "polling").strip().lower()
+# Bot Execution Mode: Render bulutida avtomatik 'webhook' (409 Conflict bo'lmasligi uchun), lokalda 'polling'
+_raw_mode = os.getenv("BOT_MODE", "").strip().lower()
+if os.getenv("RENDER", "").lower() == "true" and WEB_APP_URL.startswith("https://"):
+    BOT_MODE = "webhook"
+else:
+    BOT_MODE = _raw_mode or "polling"
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "mmm_secret_token_12345").strip()
 
 # Local tunnel toggle (only for local development on Windows if needed)
