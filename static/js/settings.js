@@ -13,11 +13,17 @@ let globalSettings = {};
 
     function openSettingsModal() {
       if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+      document.getElementById('settings-modal')?.classList.add('active');
+      const curTheme = (() => { try { return localStorage.getItem('mmm_theme') || 'dark'; } catch (e) { return 'dark'; } })();
+      if (typeof setAppTheme === 'function') setAppTheme(curTheme);
+      const adminBlock = document.getElementById('settings-admin-block');
       if (!isAdmin) {
-        alert("🔒 Modullar sozlamasi faqat tizim egasi (admin) uchun ochiq.");
+        if (adminBlock) adminBlock.style.display = 'none';
+        const modList = document.getElementById('settings-modules-list');
+        if (modList) modList.innerHTML = '<div style="font-size:11px; color:#94A3B8; text-align:center; padding:10px;">🔒 Modullar va Google Sheets faqat tizim egasi (admin) uchun.</div>';
         return;
       }
-      document.getElementById('settings-modal')?.classList.add('active');
+      if (adminBlock) adminBlock.style.display = 'block';
       loadSettings();
     }
 

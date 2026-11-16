@@ -24,7 +24,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- ULTRA-FAST EMBEDDED CSS (0.02s Instant Render - No 3.5MB Tailwind CDN lag!) -->
-  <link rel="stylesheet" href="/static/css/app.css?v=3">
+  <link rel="stylesheet" href="/static/css/app.css?v=7">
 </head>
 <body>
 
@@ -35,7 +35,23 @@
   <header>
     <div class="brand-wrap">
       <div class="brand-avatar">
-        <div class="brand-avatar-inner">🤖</div>
+        <div class="brand-avatar-inner">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="mmmBotGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#00F2FE"/>
+                <stop offset="0.55" stop-color="#00F5A0"/>
+                <stop offset="1" stop-color="#A855F7"/>
+              </linearGradient>
+            </defs>
+            <rect x="4" y="6" width="16" height="13" rx="5" stroke="url(#mmmBotGrad)" stroke-width="2" fill="rgba(0,242,254,0.12)"/>
+            <path d="M12 2.5V6" stroke="#00F2FE" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="12" cy="2" r="1.5" fill="#00F5A0"/>
+            <rect x="7.5" y="10.5" width="9" height="4" rx="2" fill="#06090F" stroke="url(#mmmBotGrad)" stroke-width="1.2"/>
+            <circle cx="10" cy="12.5" r="1.1" fill="#00F2FE"/>
+            <circle cx="14" cy="12.5" r="1.1" fill="#00F5A0"/>
+          </svg>
+        </div>
       </div>
       <div>
         <div class="brand-title">
@@ -448,11 +464,11 @@
   </nav>
 
   <!-- JAVASCRIPT: INSTANT RENDER & ULTRA FAST LOGIC -->
-  <script src="/static/js/app.js?v=6" defer></script>
+  <script src="/static/js/app.js?v=7" defer></script>
 
   <!-- FLOATING AI VOICE ASSISTANT BUTTON -->
   <button onclick="openAiModal()" title="Ovozli AI Yordamchi" style="position:fixed; right:16px; bottom:116px; z-index:45; display:flex; align-items:center; gap:6px; padding:8px 13px; border-radius:999px; background:linear-gradient(135deg,#A855F7,#00F2FE); border:none; color:#06090F; font-weight:900; font-size:11px; cursor:pointer; box-shadow:0 4px 18px rgba(168,85,247,0.45);">
-    <span style="font-size:14px;">🤖</span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.6 9.4L22 12L14.6 14.6L12 22L9.4 14.6L2 12L9.4 9.4L12 2Z" fill="#06090F"/></svg>
     <span>AI</span>
   </button>
 
@@ -623,7 +639,15 @@
       </div>
 
       <div class="modal-body">
-        <div style="margin-bottom:14px; padding:12px; border-radius:12px; background:rgba(0,242,254,0.06); border:1px solid rgba(0,242,254,0.2);">
+        <div style="margin-bottom:14px; padding:12px; border-radius:12px; background:rgba(168,85,247,0.07); border:1px solid rgba(168,85,247,0.22);">
+          <div style="font-size:12px; font-weight:800; color:#FFF; margin-bottom:4px;">🎨 Ilova Mavzusi (Rejim)</div>
+          <div style="font-size:10px; color:#94A3B8; margin-bottom:8px;">Qorong'u yoki yorug' rejimni tanlang:</div>
+          <div style="display:flex; gap:8px;">
+            <button id="theme-btn-dark" onclick="setAppTheme('dark')" class="theme-opt-btn active">🌙 Qorong'u rejim</button>
+            <button id="theme-btn-light" onclick="setAppTheme('light')" class="theme-opt-btn">☀️ Yorug' rejim</button>
+          </div>
+        </div>
+        <div id="settings-admin-block" style="margin-bottom:14px; padding:12px; border-radius:12px; background:rgba(0,242,254,0.06); border:1px solid rgba(0,242,254,0.2);">
           <div style="font-size:12px; font-weight:800; color:#FFF; margin-bottom:4px;">📊 Google Sheets Mijozlar Bazasi</div>
           <div style="font-size:10px; color:#94A3B8; margin-bottom:8px;">Asl mijozlar jadvali havolasini kiriting (hamma ko'ra oladigan qilib ochilgan bo'lishi kerak):</div>
           <input type="text" id="sheets-url-input" placeholder="https://docs.google.com/spreadsheets/d/..." style="width:100%; background:#0B111E; border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:8px 10px; color:#FFF; font-size:11px; outline:none; margin-bottom:8px;">

@@ -564,3 +564,81 @@
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.5; transform: scale(1.3); }
     }
+
+/* ==================== LIGHT THEME (YORUG' REJIM) ==================== */
+html.light-theme body {
+  background-color: #F1F5F9;
+  color: #0F172A;
+}
+html.light-theme .neon-ambient-glow {
+  opacity: 0.25;
+}
+html.light-theme header,
+html.light-theme .bottom-nav {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+html.light-theme .glass-card,
+html.light-theme .modal-dialog {
+  background: #FFFFFF !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+  color: #0F172A;
+}
+html.light-theme .brand-title,
+html.light-theme .kpi-val,
+html.light-theme .chart-title,
+html.light-theme [style*="color:#FFF"],
+html.light-theme [style*="color:#fff"],
+html.light-theme [style*="color:#E2E8F0"] {
+  color: #0F172A !important;
+}
+html.light-theme [style*="color:#94A3B8"],
+html.light-theme [style*="color:#64748B"],
+html.light-theme .kpi-sub {
+  color: #475569 !important;
+}
+html.light-theme input,
+html.light-theme select,
+html.light-theme #ai-chat-box {
+  background: #F8FAFC !important;
+  color: #0F172A !important;
+  border-color: rgba(15, 23, 42, 0.16) !important;
+}
+html.light-theme .period-btn,
+html.light-theme .cat-pill,
+html.light-theme .nav-item {
+  color: #475569;
+}
+html.light-theme .period-btn.active,
+html.light-theme .cat-pill.active,
+html.light-theme .nav-item.active {
+  color: #0284C7 !important;
+}
+html.light-theme .faq-item {
+  background: #F8FAFC !important;
+  color: #334155 !important;
+}
+.theme-opt-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.05);
+  color: #94A3B8;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+html.light-theme .theme-opt-btn {
+  border-color: rgba(15, 23, 42, 0.14);
+  background: #F1F5F9;
+  color: #475569;
+}
+.theme-opt-btn.active {
+  background: linear-gradient(135deg,#00F2FE,#00F5A0) !important;
+  color: #06090F !important;
+  border-color: transparent !important;
+}

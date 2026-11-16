@@ -1,7 +1,22 @@
 const tg = window.Telegram?.WebApp;
-    const tgUser = tg?.initDataUnsafe?.user;
-    const tgInitData = tg?.initData || '';
-    const currentUserId = tgUser ? tgUser.id : null;
+const tgUser = tg?.initDataUnsafe?.user;
+const tgInitData = tg?.initData || '';
+const currentUserId = tgUser ? tgUser.id : null;
+
+function setAppTheme(theme) {
+  const isLight = theme === 'light';
+  document.documentElement.classList.toggle('light-theme', isLight);
+  try { localStorage.setItem('mmm_theme', isLight ? 'light' : 'dark'); } catch (e) {}
+  document.getElementById('theme-btn-dark')?.classList.toggle('active', !isLight);
+  document.getElementById('theme-btn-light')?.classList.toggle('active', isLight);
+  try {
+    if (tg) {
+      tg.headerColor = isLight ? '#F1F5F9' : '#06090F';
+      tg.backgroundColor = isLight ? '#F1F5F9' : '#06090F';
+    }
+  } catch (e) {}
+}
+setAppTheme((() => { try { return localStorage.getItem('mmm_theme') || 'dark'; } catch (e) { return 'dark'; } })());
     // UI uchun taxminiy rol. Haqiqiy ruxsatni FAQAT server (initData imzosi orqali) beradi.
     let isAdmin = (String(currentUserId) === '6656667725');
 
@@ -76,7 +91,7 @@ function switchTab(tab) {
 }
 
 function openSettingsModal() {
-  ensureScript('/static/js/settings.js?v=3').then(() => {
+  ensureScript('/static/js/settings.js?v=7').then(() => {
     if (typeof window._settingsReady === 'function') window._settingsReady();
   });
 }
