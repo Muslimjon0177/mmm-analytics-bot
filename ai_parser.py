@@ -573,7 +573,7 @@ def _call_gemini_json(payload: Dict[str, Any], timeout: int = 10) -> Optional[Di
     """Ishlaydigan Gemini modellarini navbat bilan sinab, toza JSON javob qaytaradi"""
     if not GEMINI_API_KEY:
         return None
-    models = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.8-flash", "gemini-pro-latest"]
+    models = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.8-flash"]
     data = json.dumps(payload).encode("utf-8")
     for model_name in models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
@@ -602,17 +602,18 @@ def answer_business_question(question: str, context: Dict[str, Any], history: Op
         return _fallback_action_or_answer(question, context)
 
     system_txt = (
-        "Sen MMM Analytics kompaniyasining o'ta aqlli moliyaviy va ombor AI maslahatchisisan (xuddi Gemini kabi erkin va mantiqli fikrlaysan). "
-        "Faqat o'zbek tilida, tabiiy, tushunarli va jonli nutqqa mos qilib javob ber (yulduzcha ** ishlatma). "
-        "Kontekstda bugungi va kechagi savdo, kassa mantiqi (kechagi qoldiq, karta, dollar, rasxod, uyga ketyapti, farq), mijozlar qarzi va `recent_records` (ID bilan) bor. "
-        "Oldingi suhbat tarixini eslab qol ('uni o'chir', 'o'sha mijoz', 'kechagidan farqi nima?' kabi savollarga chuqur tahlil bilan javob ber). "
-        "Foydalanuvchi savol bersa yoki tahlil so'rasa action='answer' qilib, faqat real raqamlarga tayanib aqlli javob yoz. "
-        "Agar foydalanuvchi aniq bir yozuvni O'CHIRISHNI aytsa: action='delete_record', record_id=<id>. "
-        "Agar foydalanuvchi aniq bir yozuvni TAHRIRLASHNI aytsa: action='edit_record', record_id=<id>, updates={...} "
-        "(faqat: category, item_name, quantity, unit, price, total_amount, partner_name, currency, amount_usd, payment_method). "
-        'FAQAT JSON qaytar: {"action": "answer|delete_record|edit_record", "record_id": null, "updates": null, "answer": "..."}'
+        "Sen MMM Analytics kompaniyasining o'ta aqlli, chuqur fikrlaydigan moliyaviy va ombor AI tahlilchisisiz (xuddi Gemini kabi). "
+        "Faqat o'zbek tilida, tabiiy, aniq, mantiqli va jonli nutqqa mos qilib javob ber (yulduzcha ** ishlatma). "
+        "Kontekstda `today`, `yesterday`, `stats_7days`, `stats_30days`, `customers` va `recent_records` (ID bilan) bor. "
+        "Foiz o'sish, foyda/kassa farqi, qarzdorlar tahlili va oldingi suhbat tarixini ('uni o'chir', 'kechagidan farqi nima?') mukammal hisobla. "
+        "Amallar:\n"
+        "- Savol/tahlil bo'lsa: action='answer'\n"
+        "- Yangi savdo/to'lov/rasxod/uyga yozishni aytsa ('Ali akaga 5 ta olma 170 dan nasiya yoz', 'rasxod 100 ming qo'sh'): action='add_record', text='<xabar matni>'\n"
+        "- Yozuvni o'chirishni aytsa ('#12 ni o'chir', 'oxirgi yozuvni o'chir'): action='delete_record', record_id=<id>\n"
+        "- Yozuvni tahrirlashni aytsa: action='edit_record', record_id=<id>, updates={...} (category, item_name, quantity, unit, price, total_amount, partner_name, currency, amount_usd, payment_method)\n"
+        'FAQAT JSON qaytar: {"action": "answer|add_record|delete_record|edit_record", "record_id": null, "updates": null, "text": null, "answer": "..."}'
     )
-    compact_ctx = json.dumps(context, ensure_ascii=False, default=str)[:14000]
+    compact_ctx = json.dumps(context, ensure_ascii=False, default=str)[:16000]
     contents = []
     for turn in (history or [])[-8:]:
         role = "model" if turn.get("role") == "ai" else "user"
@@ -628,13 +629,14 @@ def answer_business_question(question: str, context: Dict[str, Any], history: Op
     parsed = _call_gemini_json(payload, timeout=10)
     if parsed:
         act = parsed.get("action") or "answer"
-        if act not in ("answer", "delete_record", "edit_record"):
+        if act not in ("answer", "add_record", "delete_record", "edit_record"):
             act = "answer"
         return {
             "question": question,
             "action": act,
             "record_id": int(parsed["record_id"]) if parsed.get("record_id") else None,
             "updates": parsed.get("updates") if isinstance(parsed.get("updates"), dict) else None,
+            "text": str(parsed.get("text") or "") if parsed.get("text") else None,
             "answer": str(parsed.get("answer") or ""),
         }
     return _fallback_action_or_answer(question, context)

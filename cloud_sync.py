@@ -51,12 +51,41 @@ def download_db_from_cloud():
     except Exception as e:
         logger.warning(f"Bulutdan bazani yuklashda xatolik: {e}")
 
+def _ensure_data_branch(token: str):
+    """Agar GitHub'da 'data' tarmog'i hali yaratilmagan bo'lsa, 'main' dan avtomatik yaratadi"""
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "MMM-Analytics-CloudSync"
+    }
+    try:
+        req = urllib.request.Request(f"https://api.github.com/repos/{GITHUB_REPO}/git/ref/heads/{BRANCH}", headers=headers)
+        with urllib.request.urlopen(req, timeout=8):
+            return
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            return
+    try:
+        req_main = urllib.request.Request(f"https://api.github.com/repos/{GITHUB_REPO}/git/ref/heads/main", headers=headers)
+        with urllib.request.urlopen(req_main, timeout=8) as r:
+            sha = json.loads(r.read().decode("utf-8"))["object"]["sha"]
+        payload = json.dumps({"ref": f"refs/heads/{BRANCH}", "sha": sha}).encode("utf-8")
+        req_create = urllib.request.Request(
+            f"https://api.github.com/repos/{GITHUB_REPO}/git/refs",
+            data=payload, headers={**headers, "Content-Type": "application/json"}, method="POST"
+        )
+        with urllib.request.urlopen(req_create, timeout=8):
+            logger.info(f"✅ GitHub '{BRANCH}' zaxira tarmog'i avtomatik yaratildi!")
+    except Exception as ce:
+        logger.warning(f"GitHub '{BRANCH}' tarmog'ini yaratishda: {ce}")
+
 def _do_upload():
     global _last_sync_time
     token = os.getenv("GITHUB_TOKEN", GITHUB_TOKEN).strip()
     with _sync_lock:
         if not token or not GITHUB_REPO or not os.path.exists(DB_PATH):
             return
+        _ensure_data_branch(token)
 
         try:
             with open(DB_PATH, "rb") as f:

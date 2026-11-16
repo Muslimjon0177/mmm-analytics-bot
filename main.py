@@ -822,6 +822,15 @@ def cmd_holat(message):
         wh_lines = [f"• <b>Webhook tekshirish xatosi:</b> <code>{html.escape(str(e))}</code>"]
 
     allowed_str = ", ".join(str(x) for x in ALLOWED_GROUP_IDS) if ALLOWED_GROUP_IDS else "Hamma guruhlar ochiq (cheklov yo'q)"
+    from config import TURSO_DATABASE_URL, DB_PATH
+    has_turso = bool(TURSO_DATABASE_URL)
+    has_gh_sync = bool(os.getenv("GITHUB_TOKEN", "").strip())
+    if has_turso:
+        persist_str = "✅ Turso Cloud (abadiy saqlanadi)"
+    elif has_gh_sync:
+        persist_str = "✅ GitHub Cloud Sync ('data' branch)"
+    else:
+        persist_str = "⚠️ FAQAT LOKAL (Render deployda o'chadi! TURSO_DATABASE_URL yoki GITHUB_TOKEN qo'shing)"
     recent = get_filtered_records(limit=3)
     rec_lines = []
     for r in recent:
@@ -836,6 +845,7 @@ def cmd_holat(message):
         "🩺 <b>BOT VA GURUH DIAGNOSTIKASI (/holat)</b>\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
         f"• <b>Rejim (BOT_MODE):</b> <code>{html.escape(str(BOT_MODE))}</code>\n"
+        f"• <b>Baza saqlanishi:</b> {persist_str}\n"
         f"• <b>WebApp URL:</b> <code>{html.escape(str(CURRENT_WEB_APP_URL or ''))}</code>\n"
         f"• <b>Ruxsat etilgan guruhlar (ALLOWED_GROUP_IDS):</b> <code>{html.escape(allowed_str)}</code>\n"
         + "\n".join(wh_lines) +
@@ -927,6 +937,32 @@ def handle_pending_fix_text(message):
         )
 
 # ----------------- CALLBACK TUGMALAR -----------------
+
+@bot.message_handler(content_types=['document'], func=lambda m: m.chat.type == 'private')
+def handle_admin_db_restore(message):
+    """Admin botga .db fayl yuborsa, bazani 1 bosishda tiklash (deploydan keyin yo'qolmasligi uchun)"""
+    if not message.from_user or not is_admin(message.from_user.id):
+        return
+    doc = message.document
+    if not doc or not (doc.file_name or "").lower().endswith(".db"):
+        return
+    try:
+        from config import DB_PATH, TURSO_DATABASE_URL
+        if TURSO_DATABASE_URL:
+            bot.reply_to(message, "ℹ️ Sizda Turso Cloud baza ulangan, lokal .db tiklash shart emas.")
+            return
+        file_info = bot.get_file(doc.file_id)
+        db_bytes = bot.download_file(file_info.file_path)
+        if len(db_bytes) < 1024:
+            bot.reply_to(message, "⚠️ Fayl bo'sh yoki buzilgan.")
+            return
+        with open(DB_PATH, "wb") as f:
+            f.write(db_bytes)
+        init_db()
+        recalculate_day_summary()
+        bot.reply_to(message, f"✅ <b>Baza muvaffaqiyatli tiklandi!</b> ({len(db_bytes)} bayt)")
+    except Exception as e:
+        bot.reply_to(message, f"⚠️ Bazani tiklashda xatolik: <code>{html.escape(str(e))}</code>")
 
 @bot.message_handler(content_types=['contact'], func=lambda m: m.chat.type == 'private')
 def handle_customer_contact(message):

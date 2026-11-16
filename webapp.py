@@ -483,8 +483,10 @@ def api_ai_ask():
         context = {
             "today": get_daily_summary(today_str),
             "yesterday": get_daily_summary(yest_str),
-            "customers": get_all_customers(order_by="debt")[:40],
-            "recent_records": get_filtered_records(limit=15),
+            "stats_7days": (get_advanced_stats("7days") or {}).get("kpi"),
+            "stats_30days": (get_advanced_stats("month") or {}).get("kpi"),
+            "customers": get_all_customers(order_by="debt")[:60],
+            "recent_records": get_filtered_records(limit=20),
         }
         if "audio" in request.files:
             audio_file = request.files["audio"]
@@ -510,7 +512,34 @@ def api_ai_ask():
         mutated = False
         answer = ai_res.get("answer") or ""
 
-        if action == "delete_record" and rec_id:
+        if action == "add_record" and ai_res.get("text"):
+            from ai_parser import analyze_message
+            from database import get_all_customer_names
+            from customer_matcher import resolve_customer_name
+            parsed_new = analyze_message(ai_res["text"])
+            if parsed_new.get("is_relevant") and parsed_new.get("records"):
+                existing = get_all_customer_names()
+                for rec in parsed_new["records"]:
+                    p_name = rec.get("partner_name")
+                    if p_name and rec.get("category") in ("nasiya", "pul_keldi", "qaytarish"):
+                        p_name = resolve_customer_name(p_name, existing)["resolved"]
+                    save_record(
+                        category=rec.get("category", "naqd"),
+                        item_name=rec.get("item_name"),
+                        quantity=rec.get("quantity"),
+                        unit=rec.get("unit"),
+                        price=rec.get("price"),
+                        total_amount=rec.get("total_amount"),
+                        partner_name=p_name,
+                        currency=rec.get("currency", "UZS"),
+                        amount_usd=rec.get("amount_usd"),
+                        raw_message=ai_res["text"],
+                        sender_name="AI Assistant",
+                        payment_method=rec.get("payment_method", "cash"),
+                    )
+                mutated = True
+                answer = answer or f"✅ Bazaga {len(parsed_new['records'])} ta yozuv qo'shildi va balans yangilandi."
+        elif action == "delete_record" and rec_id:
             deleted = delete_record_by_id(int(rec_id))
             if deleted:
                 mutated = True
