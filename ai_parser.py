@@ -116,7 +116,7 @@ def parse_audio_with_gemini(audio_bytes: bytes, mime_type: str = "audio/ogg") ->
         logger.error(f"Audio base64 kodlashda xatolik: {be}")
         return None
 
-    models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest']
+    models = ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-3.8-flash']
     payload = {
         "contents": [{
             "parts": [
@@ -568,6 +568,31 @@ def _fallback_action_or_answer(question: str, context: Dict[str, Any]) -> Dict[s
             return {"question": question, "action": "delete_record", "record_id": target_id, "updates": None, "answer": ""}
     return {"question": question, "action": "answer", "record_id": None, "updates": None, "answer": _fallback_business_answer(question, context)}
 
+def _call_gemini_json(payload: Dict[str, Any], timeout: int = 10) -> Optional[Dict[str, Any]]:
+    """Ishlaydigan Gemini modellarini navbat bilan sinab, toza JSON javob qaytaradi"""
+    if not GEMINI_API_KEY:
+        return None
+    models = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-3.8-flash", "gemini-pro-latest"]
+    data = json.dumps(payload).encode("utf-8")
+    for model_name in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+                raw = body["candidates"][0]["content"]["parts"][0]["text"].strip()
+                if raw.startswith("```json"):
+                    raw = raw[7:]
+                if raw.startswith("```"):
+                    raw = raw[3:]
+                if raw.endswith("```"):
+                    raw = raw[:-3]
+                return json.loads(raw.strip())
+        except Exception as e:
+            logger.warning(f"Gemini ({model_name}) urinishi: {e}")
+            continue
+    return None
+
 def answer_business_question(question: str, context: Dict[str, Any], history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     """Mini App ichidagi savol yoki admin buyrug'ini (ko'p bosqichli suhbat tarixi bilan) tahlil qiladi"""
     if not question or not question.strip():
@@ -575,13 +600,12 @@ def answer_business_question(question: str, context: Dict[str, Any], history: Op
     if not GEMINI_API_KEY:
         return _fallback_action_or_answer(question, context)
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     system_txt = (
-        "Sen MMM Analytics aqlli ovozli biznes yordamchisisiz (xuddi Gemini Live kabi jonli suhbatdosh). "
-        "Faqat o'zbek tilida, tabiiy, samimiy va jonli nutqqa mos qilib qisqa gapir (yulduzcha ** yoki murakkab belgilar ishlatma). "
-        "Kontekstda `recent_records` (oxirgi yozuvlar `id` si bilan) va savdo/kassa/qarz raqamlari bor. "
-        "Oldingi suhbat tarixini ham inobatga ol ('uni o'chir', 'o'sha mijoz' kabi murojaatlarni tushun). "
-        "Foydalanuvchi savol bersa action='answer' qilib, faqat real raqamlarga tayanib qisqa javob yoz. "
+        "Sen MMM Analytics kompaniyasining o'ta aqlli moliyaviy va ombor AI maslahatchisisan (xuddi Gemini kabi erkin va mantiqli fikrlaysan). "
+        "Faqat o'zbek tilida, tabiiy, tushunarli va jonli nutqqa mos qilib javob ber (yulduzcha ** ishlatma). "
+        "Kontekstda bugungi va kechagi savdo, kassa mantiqi (kechagi qoldiq, karta, dollar, rasxod, uyga ketyapti, farq), mijozlar qarzi va `recent_records` (ID bilan) bor. "
+        "Oldingi suhbat tarixini eslab qol ('uni o'chir', 'o'sha mijoz', 'kechagidan farqi nima?' kabi savollarga chuqur tahlil bilan javob ber). "
+        "Foydalanuvchi savol bersa yoki tahlil so'rasa action='answer' qilib, faqat real raqamlarga tayanib aqlli javob yoz. "
         "Agar foydalanuvchi aniq bir yozuvni O'CHIRISHNI aytsa: action='delete_record', record_id=<id>. "
         "Agar foydalanuvchi aniq bir yozuvni TAHRIRLASHNI aytsa: action='edit_record', record_id=<id>, updates={...} "
         "(faqat: category, item_name, quantity, unit, price, total_amount, partner_name, currency, amount_usd, payment_method). "
@@ -598,28 +622,20 @@ def answer_business_question(question: str, context: Dict[str, Any], history: Op
     payload = {
         "system_instruction": {"parts": [{"text": system_txt}]},
         "contents": contents,
-        "generationConfig": {"temperature": 0.25, "responseMimeType": "application/json", "maxOutputTokens": 500},
+        "generationConfig": {"temperature": 0.3, "responseMimeType": "application/json", "maxOutputTokens": 600},
     }
-    try:
-        req = urllib.request.Request(
-            url, data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"}, method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=12) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            parsed = json.loads(data["candidates"][0]["content"]["parts"][0]["text"])
-            act = parsed.get("action") or "answer"
-            if act not in ("answer", "delete_record", "edit_record"):
-                act = "answer"
-            return {
-                "question": question,
-                "action": act,
-                "record_id": int(parsed["record_id"]) if parsed.get("record_id") else None,
-                "updates": parsed.get("updates") if isinstance(parsed.get("updates"), dict) else None,
-                "answer": str(parsed.get("answer") or ""),
-            }
-    except Exception as e:
-        logger.warning(f"AI savol-javob xatoligi (fallback ishlatildi): {e}")
+    parsed = _call_gemini_json(payload, timeout=10)
+    if parsed:
+        act = parsed.get("action") or "answer"
+        if act not in ("answer", "delete_record", "edit_record"):
+            act = "answer"
+        return {
+            "question": question,
+            "action": act,
+            "record_id": int(parsed["record_id"]) if parsed.get("record_id") else None,
+            "updates": parsed.get("updates") if isinstance(parsed.get("updates"), dict) else None,
+            "answer": str(parsed.get("answer") or ""),
+        }
     return _fallback_action_or_answer(question, context)
 
 def answer_business_audio_question(audio_bytes: bytes, mime_type: str, context: Dict[str, Any], history: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
@@ -627,12 +643,11 @@ def answer_business_audio_question(audio_bytes: bytes, mime_type: str, context: 
     if not GEMINI_API_KEY:
         return {"question": "🎙 Ovozli savol", "action": "answer", "record_id": None, "updates": None, "answer": _fallback_business_answer("bugungi savdo", context)}
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
     compact_ctx = json.dumps(context, ensure_ascii=False, default=str)[:14000]
     hist_lines = "\n".join(f"{t.get('role','user')}: {t.get('text','')}" for t in (history or [])[-6:])
     prompt = (
-        "Sen jonli o'zbekcha ovozli yordamchisan (yulduzcha ** ishlatma, tabiiy gapir). "
+        "Sen jonli va aqlli o'zbekcha biznes AI yordamchisan (yulduzcha ** ishlatma, tabiiy gapir). "
         "Foydalanuvchining ovozli savolini yoki admin buyrug'ini eshit (o'chirish/tahrirlash ham bo'lishi mumkin).\n"
         f"Oldingi suhbat:\n{hist_lines}\n\nBaza:\n{compact_ctx}\n\n"
         'FAQAT JSON qaytar: {"question": "eshitilgan matn", "action": "answer|delete_record|edit_record", "record_id": null, "updates": null, "answer": "o\'zbekcha jonli javob"}'
@@ -642,29 +657,21 @@ def answer_business_audio_question(audio_bytes: bytes, mime_type: str, context: 
             {"text": prompt},
             {"inline_data": {"mime_type": mime_type or "audio/webm", "data": b64_audio}}
         ]}],
-        "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json", "maxOutputTokens": 550},
+        "generationConfig": {"temperature": 0.25, "responseMimeType": "application/json", "maxOutputTokens": 600},
     }
-    try:
-        req = urllib.request.Request(
-            url, data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"}, method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            parsed = json.loads(data["candidates"][0]["content"]["parts"][0]["text"])
-            act = parsed.get("action") or "answer"
-            if act not in ("answer", "delete_record", "edit_record"):
-                act = "answer"
-            return {
-                "question": str(parsed.get("question") or "🎙 Ovozli savol"),
-                "action": act,
-                "record_id": int(parsed["record_id"]) if parsed.get("record_id") else None,
-                "updates": parsed.get("updates") if isinstance(parsed.get("updates"), dict) else None,
-                "answer": str(parsed.get("answer") or _fallback_business_answer("bugungi savdo", context)),
-            }
-    except Exception as e:
-        logger.warning(f"Audio AI savol xatoligi: {e}")
-        return {"question": "🎙 Ovozli savol", "action": "answer", "record_id": None, "updates": None, "answer": _fallback_business_answer("bugungi savdo", context)}
+    parsed = _call_gemini_json(payload, timeout=15)
+    if parsed:
+        act = parsed.get("action") or "answer"
+        if act not in ("answer", "delete_record", "edit_record"):
+            act = "answer"
+        return {
+            "question": str(parsed.get("question") or "🎙 Ovozli savol"),
+            "action": act,
+            "record_id": int(parsed["record_id"]) if parsed.get("record_id") else None,
+            "updates": parsed.get("updates") if isinstance(parsed.get("updates"), dict) else None,
+            "answer": str(parsed.get("answer") or _fallback_business_answer("bugungi savdo", context)),
+        }
+    return {"question": "🎙 Ovozli savol", "action": "answer", "record_id": None, "updates": None, "answer": _fallback_business_answer("bugungi savdo", context)}
 
 def synthesize_uzbek_speech_b64(text: str, voice: str = "uz-UZ-SardorNeural") -> Optional[str]:
     """Matnni tabiiy o'zbek ovoziga (MP3 base64) aylantiradi"""

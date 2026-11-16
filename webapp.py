@@ -519,7 +519,6 @@ def api_ai_ask():
                 answer = f"⚠️ #{rec_id}-yozuvni tahrirlab bo'lmadi."
 
         final_answer = answer or "Bajarildi."
-        audio_b64 = synthesize_uzbek_speech_b64(final_answer) if want_voice else None
 
         return jsonify({
             "success": True,
@@ -527,11 +526,22 @@ def api_ai_ask():
             "action": action,
             "mutated": mutated,
             "answer": final_answer,
-            "audio_b64": audio_b64,
         })
     except Exception as e:
         logger.error(f"AI ask xatoligi: {e}")
         return jsonify({"error": str(e)}), 500
+
+@app.route("/api/ai-tts", methods=["POST"])
+def api_ai_tts():
+    """Matnni tabiiy o'zbek ovoziga aylantirish (asinxron, chatni qotirmaydi)"""
+    if not is_admin_request(request):
+        return jsonify({"error": "Ruxsat etilmagan"}), 403
+    payload = request.get_json(silent=True) or {}
+    text = (payload.get("text") or "").strip()
+    if not text:
+        return jsonify({"audio_b64": None})
+    audio_b64 = synthesize_uzbek_speech_b64(text)
+    return jsonify({"audio_b64": audio_b64})
 
 @app.after_request
 def add_cache_headers(response):

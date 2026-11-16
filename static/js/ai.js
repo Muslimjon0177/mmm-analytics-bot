@@ -79,7 +79,7 @@ function _stopCurrentSpeech() {
   try { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } catch (e) {}
 }
 
-function _playAiReply(text, audioB64) {
+async function _playAiReply(text) {
   const toggle = document.getElementById('ai-tts-toggle');
   const wantVoice = !toggle || toggle.checked;
   if (!wantVoice) {
@@ -101,16 +101,26 @@ function _playAiReply(text, audioB64) {
     }
   };
 
-  if (audioB64) {
-    try {
-      const audio = new Audio('data:audio/mp3;base64,' + audioB64);
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const ttsRes = await apiFetch('/api/ai-tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: ctrl.signal
+    });
+    clearTimeout(timer);
+    const ttsData = await ttsRes.json();
+    if (ttsData.audio_b64) {
+      const audio = new Audio('data:audio/mp3;base64,' + ttsData.audio_b64);
       _aiCurrentAudio = audio;
       audio.onended = onDone;
       audio.onerror = () => _fallbackBrowserTTS(text, onDone);
       audio.play().catch(() => _fallbackBrowserTTS(text, onDone));
       return;
-    } catch (e) {}
-  }
+    }
+  } catch (e) {}
   _fallbackBrowserTTS(text, onDone);
 }
 
@@ -185,7 +195,7 @@ async function sendAiQuestion(customText) {
     const ans = data.answer || data.error || 'Javob olinmadi.';
     _appendAiBubble('ai', ans);
     if (data.mutated && typeof refreshData === 'function') refreshData();
-    _playAiReply(ans, data.audio_b64);
+    _playAiReply(ans);
   } catch (e) {
     _appendAiBubble('ai', '⚠️ Server bilan aloqa xatoligi.');
     _setOrbState('idle', 'Tayyor — qayta urinib ko‘ring');
@@ -285,7 +295,7 @@ async function _startMediaRecorderFallback() {
         const ans = data.answer || data.error || 'Javob olinmadi.';
         _appendAiBubble('ai', ans);
         if (data.mutated && typeof refreshData === 'function') refreshData();
-        _playAiReply(ans, data.audio_b64);
+        _playAiReply(ans);
       } catch (err) {
         _appendAiBubble('ai', '⚠️ Ovozni yuborishda xatolik.');
         _setOrbState('idle', 'Tayyor');

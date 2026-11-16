@@ -105,7 +105,7 @@ function filterAndSwitch(cat) {
   ensureScript('/static/js/records.js?v=3').then(() => setRecordCategory(cat));
 }
 function openAiModal() {
-  ensureScript('/static/js/ai.js?v=6').then(() => {
+  ensureScript('/static/js/ai.js?v=8').then(() => {
     if (typeof window._aiModalReady === 'function') window._aiModalReady();
   });
 }
