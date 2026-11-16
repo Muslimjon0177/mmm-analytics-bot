@@ -3,6 +3,8 @@ import os
 import sys
 import time
 import html
+import hmac
+import hashlib
 import urllib.request
 import logging
 import threading
@@ -11,7 +13,10 @@ import atexit
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp
+from telebot.types import (
+    InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, MenuButtonWebApp,
+    ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+)
 
 # Fix UTF-8 stdout encoding for Windows console compatibility
 if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
@@ -28,6 +33,7 @@ from database import (
     get_records_by_category,
     get_filtered_records,
     get_all_customers,
+    get_customer_detail,
     get_all_records_for_export,
     delete_records_by_message,
     get_records_by_message,
@@ -36,6 +42,7 @@ from database import (
     get_all_customer_names,
     get_customer_by_id,
     get_customer_id_by_name,
+    find_customer_by_phone,
     reassign_message_partner,
     recalculate_customer_balance,
     recalculate_day_summary,
@@ -126,11 +133,15 @@ def get_guest_menu() -> InlineKeyboardMarkup:
     markup = InlineKeyboardMarkup(row_width=1)
     if CURRENT_WEB_APP_URL:
         markup.add(
-            InlineKeyboardButton("🚀 Mini Appni Ochish (Demo & Imkoniyatlar)", web_app=WebAppInfo(url=CURRENT_WEB_APP_URL))
+            InlineKeyboardButton("📊 Hisob-kitob ilovasi (Sotib olish / Demo)", web_app=WebAppInfo(url=CURRENT_WEB_APP_URL))
+        )
+    else:
+        markup.add(
+            InlineKeyboardButton("📊 Hisob-kitob ilovasi (Sotib olish)", url="https://t.me/fbr_a?text=men%20sotib%20olmoqchiman")
         )
     markup.add(
-        InlineKeyboardButton("⚡ Botni Sotib Olish — 777 000 so'm/oy", url="https://t.me/fbr_a?text=men%20sotib%20olmoqchiman"),
-        InlineKeyboardButton("💬 Muallif bilan bog'lanish (@fbr_a)", url="https://t.me/fbr_a")
+        InlineKeyboardButton("👤 Mijozlar (Ostatkani ko'rish)", callback_data="guest_ostatka"),
+        InlineKeyboardButton("⚡ Botni Sotib Olish — 777 000 so'm/oy", url="https://t.me/fbr_a?text=men%20sotib%20olmoqchiman")
     )
     return markup
 
@@ -588,10 +599,81 @@ def check_admin_or_reply(message) -> bool:
     )
     return False
 
+def make_customer_token(cid: int) -> str:
+    """Mijozning shaxsiy kabineti uchun soxtalashtirib bo'lmaydigan imzo"""
+    secret = (BOT_TOKEN or "mmm-secret").encode("utf-8")
+    sig = hmac.new(secret, f"cust:{cid}".encode("utf-8"), hashlib.sha256).hexdigest()[:12]
+    return f"c_{cid}_{sig}"
+
+def verify_customer_token(token: str) -> Optional[int]:
+    if not token or not token.startswith("c_"):
+        return None
+    parts = token.split("_")
+    if len(parts) != 3:
+        return None
+    try:
+        cid = int(parts[1])
+    except ValueError:
+        return None
+    expected = make_customer_token(cid)
+    return cid if hmac.compare_digest(token, expected) else None
+
+def render_customer_cabinet(cid: int):
+    """Mijozning shaxsiy ostatka va to'lov tarixini (boshqa mijozlarsiz) tayyorlaydi"""
+    cust = get_customer_by_id(cid)
+    if not cust:
+        return None, None
+    detail = get_customer_detail(cust["display_name"]) or {}
+    c_info = detail.get("customer") or cust
+    recs = detail.get("records") or []
+
+    bal = float(c_info.get("current_balance") or 0)
+    credit = float(c_info.get("total_credit") or 0)
+    paid = float(c_info.get("total_paid") or 0)
+    bal_line = f"🔴 <b>Qoldiq qarz: {format_number(bal)} so'm</b>" if bal > 0 else "🟢 <b>Hisobingiz yopiq (Qarz yo'q)</b>"
+
+    lines = [
+        f"👤 <b>{html.escape(c_info.get('display_name') or 'Mijoz')} — Shaxsiy Hisobingiz</b>",
+        "━━━━━━━━━━━━━━━━━━━━",
+        f"📑 Jami olingan tovarlar: <b>{format_number(credit)} so'm</b>",
+        f"💰 Jami to'langan summa: <b>{format_number(paid)} so'm</b>",
+        bal_line,
+        "━━━━━━━━━━━━━━━━━━━━",
+        "📜 <b>Oxirgi amaliyotlar:</b>"
+    ]
+    if not recs:
+        lines.append("<i>Hozircha operatsiyalar yo'q.</i>")
+    else:
+        for r in recs[:15]:
+            cat = r.get("category")
+            icon = "🔴 Nasiya" if cat == "nasiya" else ("💰 To'lov" if cat == "pul_keldi" else ("↩️ Qaytarish" if cat == "qaytarish" else "🟢 Naqd"))
+            item = html.escape(r.get("item_name") or "")
+            qty_str = f"{format_number(r.get('quantity'))} {html.escape(r.get('unit') or '')} ".strip() if r.get("quantity") else ""
+            amt = f"${format_number(r.get('amount_usd'))}" if r.get("currency") == "USD" and r.get("amount_usd") else f"{format_number(r.get('total_amount'))} so'm"
+            desc = f" ({qty_str} {item})".strip() if (qty_str or item) else ""
+            lines.append(f"• <code>{r.get('date_str')}</code> | {icon}{desc} — <b>{amt}</b>")
+
+    kb = InlineKeyboardMarkup()
+    tok = make_customer_token(cid)
+    kb.add(InlineKeyboardButton("🔄 Ostatkani yangilash", callback_data=f"cust_cab:{tok}"))
+    return "\n".join(lines), kb
+
 @bot.message_handler(commands=['start', 'menu', 'app'], func=lambda m: m.chat.type == 'private')
 def cmd_start(message):
     user_id = message.from_user.id
     first_name = message.from_user.first_name or "Foydalanuvchi"
+
+    # Mijoz shaxsiy havola (?start=c_<id>_<sig>) bilan kirganda -> FAQAT o'z ostatkasini ko'radi (boshqa funksiyalarga ta'sirsiz)
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) > 1 and parts[1].strip().startswith("c_"):
+        cid = verify_customer_token(parts[1].strip())
+        if cid:
+            text, kb = render_customer_cabinet(cid)
+            if text:
+                bot.send_message(message.chat.id, text, reply_markup=kb)
+                return
+        bot.send_message(message.chat.id, "⚠️ Havola eskirgan yoki noto'g'ri. Do'kon egasidan yangi havola so'rang.")
+        return
 
     # Har bir foydalanuvchi (admin yoki mehmon) uchun pastki chap MenuButton'ni faollashtirish
     if CURRENT_WEB_APP_URL:
@@ -632,6 +714,30 @@ def cmd_start(message):
             "Quyidagi <b>«🚀 Mini Appni Ochish»</b> tugmasi orqali tizimni hoziroq sinab ko'ring:"
         )
         bot.send_message(message.chat.id, guest_text, reply_markup=get_guest_menu())
+
+@bot.message_handler(commands=['havola', 'mijoz_havola'], func=lambda m: m.chat.type == 'private')
+def cmd_customer_link(message):
+    """Admin uchun istalgan mijozga shaxsiy ostatka havolasi yaratish"""
+    if not check_admin_or_reply(message): return
+    parts = (message.text or "").split(maxsplit=1)
+    query = parts[1].strip() if len(parts) > 1 else ""
+    try:
+        bot_username = bot.get_me().username
+    except Exception:
+        bot_username = "your_bot"
+
+    customers = get_all_customers(order_by="debt" if not query else "alphabetical", search=query or None)
+    if not customers:
+        bot.send_message(message.chat.id, "⚠️ Bunday mijoz topilmadi. Namuna: <code>/havola Suxrob</code>")
+        return
+
+    lines = ["🔗 <b>Mijozlar uchun shaxsiy ostatka havolalari:</b>\n<i>Mijozga o'z havolasini yuborsangiz, faqat o'z qarzini ko'radi:</i>\n"]
+    for c in customers[:10]:
+        tok = make_customer_token(c["id"])
+        link = f"https://t.me/{bot_username}?start={tok}"
+        bal = format_number(c.get("current_balance") or 0)
+        lines.append(f"• <b>{html.escape(c['display_name'])}</b> (Qarz: {bal} so'm)\n  <code>{link}</code>")
+    bot.send_message(message.chat.id, "\n".join(lines), disable_web_page_preview=True)
 
 @bot.message_handler(commands=['hisobot', 'bugun'], func=lambda m: m.chat.type == 'private')
 def cmd_hisobot(message):
@@ -822,11 +928,65 @@ def handle_pending_fix_text(message):
 
 # ----------------- CALLBACK TUGMALAR -----------------
 
+@bot.message_handler(content_types=['contact'], func=lambda m: m.chat.type == 'private')
+def handle_customer_contact(message):
+    """Mijoz faqat O'ZINING telefon raqamini yuborganda shaxsiy ostatka kabinetini ochadi"""
+    if not message.contact or not message.from_user or message.contact.user_id != message.from_user.id:
+        bot.send_message(
+            message.chat.id,
+            "⚠️ Xavfsizlik uchun faqat o'zingizning telefon raqamingizni pastdagi tugma orqali yuboring.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return
+    phone = message.contact.phone_number or ""
+    cust = find_customer_by_phone(phone)
+    if cust:
+        text, kb = render_customer_cabinet(cust["id"])
+        if text:
+            bot.send_message(message.chat.id, "✅ Mijoz topildi!", reply_markup=ReplyKeyboardRemove())
+            bot.send_message(message.chat.id, text, reply_markup=kb)
+            return
+    bot.send_message(
+        message.chat.id,
+        "⚠️ Ushbu telefon raqam bo'yicha mijoz topilmadi.\nDo'kon egasidan shaxsiy havolangizni (<code>/havola</code>) so'rang.",
+        reply_markup=ReplyKeyboardRemove()
+    )
+
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
     chat_id = call.message.chat.id
     message_id = call.message.message_id
     user_id = call.from_user.id
+
+    # --- Mijoz ostatkasini ko'rish tugmasi ---
+    if call.data == "guest_ostatka":
+        kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+        kb.add(KeyboardButton("📱 Telefon raqamimni yuborish", request_contact=True))
+        bot.send_message(
+            chat_id,
+            "👤 <b>Mijozlar ostatkasi (Shaxsiy kabinet)</b>\n\n"
+            "O'z qarzingiz va to'lovlaringiz tarixini ko'rish uchun:\n"
+            "• Do'kon egasidan olgan <b>shaxsiy havolangizni</b> bosing, YOKI\n"
+            "• Pastdagi tugma orqali <b>telefon raqamingizni yuboring</b>:",
+            reply_markup=kb
+        )
+        bot.answer_callback_query(call.id)
+        return
+
+    # --- Mijoz shaxsiy kabinetini yangilash (mijozlar uchun ochiq, imzo bilan himoyalangan) ---
+    if call.data.startswith("cust_cab:"):
+        tok = call.data.split(":", 1)[1]
+        cid = verify_customer_token(tok)
+        if not cid:
+            bot.answer_callback_query(call.id, "Havola noto'g'ri", show_alert=True)
+            return
+        text, kb = render_customer_cabinet(cid)
+        if text:
+            safe_edit_message_text(text, chat_id, message_id, reply_markup=kb)
+            bot.answer_callback_query(call.id, "✅ Ostatka yangilandi")
+        else:
+            bot.answer_callback_query(call.id, "Mijoz topilmadi")
+        return
 
     if not is_admin(user_id):
         bot.answer_callback_query(

@@ -91,9 +91,13 @@ def health():
 @app.route("/webhook", methods=["POST"])
 @app.route("/webhook/<secret>", methods=["POST"])
 def webhook(secret=None):
-    """Telegram Webhook qabul qiluvchi endpoint (serverless & production scale uchun)"""
-    if secret and secret != WEBHOOK_SECRET:
-        return jsonify({"error": "unauthorized"}), 403
+    """Telegram Webhook qabul qiluvchi endpoint (qattiq secret tekshiruvi bilan)"""
+    if WEBHOOK_SECRET:
+        hdr_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        url_ok = bool(secret and hmac.compare_digest(secret, WEBHOOK_SECRET))
+        hdr_ok = bool(hdr_secret and hmac.compare_digest(hdr_secret, WEBHOOK_SECRET))
+        if not (url_ok or hdr_ok):
+            return jsonify({"error": "unauthorized"}), 403
 
     if not _bot_instance:
         return jsonify({"error": "bot_not_initialized"}), 503
@@ -224,7 +228,10 @@ def api_records():
 
     category = request.args.get("category", "").strip()
     search = request.args.get("search", "").strip()
-    limit = int(request.args.get("limit", 100))
+    try:
+        limit = min(max(1, int(request.args.get("limit", 100))), 200)
+    except (TypeError, ValueError):
+        limit = 100
 
     try:
         valid_cats = ("kelim", "naqd", "nasiya", "pul_keldi", "qaytarish", "rasxod", "uyga", "ostatka")
@@ -542,6 +549,11 @@ def api_ai_tts():
         return jsonify({"audio_b64": None})
     audio_b64 = synthesize_uzbek_speech_b64(text)
     return jsonify({"audio_b64": audio_b64})
+
+@app.errorhandler(500)
+def handle_internal_error(err):
+    logger.error(f"Kutilmagan server xatoligi: {err}")
+    return jsonify({"error": "Ichki server xatoligi"}), 500
 
 @app.after_request
 def add_cache_headers(response):

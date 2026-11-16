@@ -631,6 +631,24 @@ def get_customer_id_by_name(display_name: str) -> Optional[int]:
     finally:
         client.close()
 
+def find_customer_by_phone(phone: str) -> Optional[Dict[str, Any]]:
+    """Telefon raqamning oxirgi 9 ta raqami bo'yicha mijozni topadi"""
+    digits = re.sub(r'\D', '', phone or '')
+    if len(digits) < 7:
+        return None
+    tail = digits[-9:]
+    client = get_client()
+    try:
+        res = client.execute("SELECT * FROM customers WHERE phone IS NOT NULL AND TRIM(phone) != ''")
+        for row in res.rows:
+            d = row_to_dict(res.columns, row)
+            p_digits = re.sub(r'\D', '', str(d.get("phone") or ""))
+            if p_digits.endswith(tail):
+                return d
+        return None
+    finally:
+        client.close()
+
 def reassign_message_partner(chat_id: int, message_id: int, new_partner: str):
     """Xabardagi mijoz ismini boshqa aniq mijozga o'tkazish va ikkala mijoz balansini qayta hisoblash"""
     client = get_client()
