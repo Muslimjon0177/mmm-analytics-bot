@@ -20,7 +20,7 @@ services:
       - key: NOTIFY_IN_GROUP
         value: "false"
       - key: BOT_MODE
-        value: "polling"
+        value: "webhook"
       - key: ENVIRONMENT
         value: "production"
       - key: PORT

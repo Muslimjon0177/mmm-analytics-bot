@@ -1227,7 +1227,11 @@ def main():
         logger.info(f"Bot WEBHOOK rejimida ishlamoqda. Webhook URL: {CURRENT_WEB_APP_URL}/webhook/{WEBHOOK_SECRET}")
         if CURRENT_WEB_APP_URL:
             webhook_endpoint = f"{CURRENT_WEB_APP_URL}/webhook/{WEBHOOK_SECRET}"
-            bot.set_webhook(url=webhook_endpoint, allowed_updates=["message", "edited_message", "callback_query"])
+            bot.set_webhook(
+                url=webhook_endpoint,
+                secret_token=WEBHOOK_SECRET or None,
+                allowed_updates=["message", "edited_message", "callback_query"]
+            )
             logger.info(f"Telegram Webhook muvaffaqiyatli o'rnatildi: {webhook_endpoint}")
         run_server(port=PORT)
 
@@ -1236,9 +1240,21 @@ def main():
         web_thread = threading.Thread(target=lambda: run_server(port=PORT), daemon=True)
         web_thread.start()
 
-        bot.delete_webhook(drop_pending_updates=False)  # qayta ishga tushganda kelgan xabarlar YO'QOLMASIN
-        bot.infinity_polling(timeout=20, long_polling_timeout=20,
-                             allowed_updates=["message", "edited_message", "callback_query"])
+        while True:
+            try:
+                bot.delete_webhook(drop_pending_updates=False)
+                bot.infinity_polling(
+                    timeout=20,
+                    long_polling_timeout=20,
+                    allowed_updates=["message", "edited_message", "callback_query"]
+                )
+            except Exception as poll_err:
+                err_txt = str(poll_err)
+                if "409" in err_txt:
+                    logger.warning("409 Conflict (eski nusxa yopilmoqda). 6 soniyadan keyin qayta ulanadi...")
+                else:
+                    logger.warning(f"Polling qayta ulanish ({err_txt}). 5 soniya kutilmoqda...")
+                time.sleep(6)
 
 if __name__ == "__main__":
     try:
