@@ -88,6 +88,22 @@ def pwa_service_worker():
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
 
+@app.route("/.well-known/assetlinks.json")
+def android_assetlinks():
+    """Google Play TWA (Trusted Web Activity) uchun domen tasdiqlash fayli"""
+    pkg = os.getenv("ANDROID_PACKAGE_NAME", "uz.barakahisobchi.app").strip()
+    fp = os.getenv("ANDROID_SHA256_FINGERPRINT", "").strip()
+    if not fp:
+        return jsonify([])
+    return jsonify([{
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {
+            "namespace": "android_app",
+            "package_name": pkg,
+            "sha256_cert_fingerprints": [fp]
+        }
+    }])
+
 @app.route("/health")
 def health():
     """Koyeb / Cloudflare / Uptime monitoring uchun Health Check endpointi"""
@@ -492,10 +508,10 @@ def api_export_excel():
 def privacy_policy():
     """Maxfiylik siyosati (Privacy Policy) sahifasi"""
     html_doc = """<!DOCTYPE html><html lang="uz"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Maxfiylik Siyosati — MMM Analytics</title>
+    <title>Maxfiylik Siyosati — Baraka Hisobchi</title>
     <style>body{font-family:system-ui,sans-serif;background:#06090F;color:#E2E8F0;max-width:720px;margin:0 auto;padding:24px;line-height:1.6}
     h1,h2{color:#00F2FE}a{color:#00F5A0}.card{background:#0F172A;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:18px;margin-top:16px}</style></head>
-    <body><h1>🔒 Maxfiylik Siyosati (Privacy Policy)</h1><p><b>MMM Analytics</b> savdo va ombor boshqaruvi tizimi foydalanuvchilarning tijoriy ma'lumotlarini qat'iy maxfiy saqlaydi.</p>
+    <body><h1>🔒 Maxfiylik Siyosati (Privacy Policy)</h1><p><b>Baraka Hisobchi</b> savdo va ombor boshqaruvi tizimi foydalanuvchilarning tijoriy ma'lumotlarini qat'iy maxfiy saqlaydi.</p>
     <div class="card"><h2>1. Yig'iladigan ma'lumotlar</h2><p>Tizim faqat siz ruxsat bergan Telegram guruhidagi savdo, kirim-chiqim, to'lov yozuvlari hamda mijozlar ro'yxatini qayta ishlaydi. Telegram Mini App autentifikatsiyasi kriptografik <code>initData</code> imzosi orqali tekshiriladi va uchinchi shaxslar cookie fayllaridan foydalanmaydi.</p>
     <h2>2. Ma'lumotlarni saqlash va himoya</h2><p>Barcha yozuvlar shifrlangan HTTPS aloqasi orqali bulutli ma'lumotlar bazasida (Turso) saqlanadi va boshqa do'kon yoki uchinchi shaxslarga berilmaydi.</p>
     <h2>3. Foydalanuvchi huquqlari</h2><p>Siz istalgan vaqtda o'z ma'lumotlaringizni Excel formatida yuklab olishingiz yoki to'liq o'chirtirishingiz mumkin. Murojaat uchun: <a href="https://t.me/fbr_a">@fbr_a</a></p></div></body></html>"""
@@ -505,10 +521,10 @@ def privacy_policy():
 def terms_of_service():
     """Ommaviy Oferta (Xizmat ko'rsatish shartlari) sahifasi"""
     html_doc = """<!DOCTYPE html><html lang="uz"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Ommaviy Oferta — MMM Analytics</title>
+    <title>Ommaviy Oferta — Baraka Hisobchi</title>
     <style>body{font-family:system-ui,sans-serif;background:#06090F;color:#E2E8F0;max-width:720px;margin:0 auto;padding:24px;line-height:1.6}
     h1,h2{color:#00F2FE}a{color:#00F5A0}.card{background:#0F172A;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:18px;margin-top:16px}</style></head>
-    <body><h1>📄 Ommaviy Oferta (Foydalanish shartlari)</h1><p>Ushbu hujjat <b>MMM Analytics</b> SaaS platformasidan foydalanish tartibini belgilaydi.</p>
+    <body><h1>📄 Ommaviy Oferta (Foydalanish shartlari)</h1><p>Ushbu hujjat <b>Baraka Hisobchi</b> SaaS platformasidan foydalanish tartibini belgilaydi.</p>
     <div class="card"><h2>1. Xizmat tavsifi</h2><p>Platforma Telegram guruhlaridagi savdo, nasiya, kassa va ombor hisob-kitoblarini avtomatlashtirish hamda Mini App orqali tahlil qilish xizmatini taqdim etadi.</p>
     <h2>2. Obuna va to'lov</h2><p>Xizmat oylik obuna asosida taqdim etiladi. Zaxira nusxalari har kuni avtomatik shakllantiriladi.</p>
     <h2>3. Aloqa</h2><p>Texnik yordam va ulanish masalalari bo'yicha: <a href="https://t.me/fbr_a">@fbr_a</a></p></div></body></html>"""

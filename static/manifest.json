@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "MMM Analytics — Savdo & Ombor CRM",
-  "short_name": "MMM Analytics",
+  "name": "Baraka Hisobchi — Savdo & Ombor CRM",
+  "short_name": "Baraka Hisobchi",
   "description": "Savdo, nasiya, kassa va ovozli AI boshqaruv ilovasi",
   "start_url": "/",
   "scope": "/",
@@ -9,10 +9,11 @@
   "orientation": "portrait",
   "background_color": "#06090F",
   "theme_color": "#06090F",
+  "categories": ["business", "finance", "productivity"],
   "icons": [
     {
       "src": "/static/icon.svg",
-      "sizes": "192x192 512x512 any",
+      "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
