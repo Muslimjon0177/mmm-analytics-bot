@@ -8,8 +8,8 @@
   <meta name="theme-color" content="#06090F">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="icon" type="image/svg+xml" href="/static/icon.svg">
-  <link rel="apple-touch-icon" href="/static/icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="/static/icon-512.png">
   
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -41,22 +41,8 @@
   <header>
     <div class="brand-wrap">
       <div class="brand-avatar">
-        <div class="brand-avatar-inner">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="mmmBotGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#00F2FE"/>
-                <stop offset="0.55" stop-color="#00F5A0"/>
-                <stop offset="1" stop-color="#A855F7"/>
-              </linearGradient>
-            </defs>
-            <rect x="4" y="6" width="16" height="13" rx="5" stroke="url(#mmmBotGrad)" stroke-width="2" fill="rgba(0,242,254,0.12)"/>
-            <path d="M12 2.5V6" stroke="#00F2FE" stroke-width="2" stroke-linecap="round"/>
-            <circle cx="12" cy="2" r="1.5" fill="#00F5A0"/>
-            <rect x="7.5" y="10.5" width="9" height="4" rx="2" fill="#06090F" stroke="url(#mmmBotGrad)" stroke-width="1.2"/>
-            <circle cx="10" cy="12.5" r="1.1" fill="#00F2FE"/>
-            <circle cx="14" cy="12.5" r="1.1" fill="#00F5A0"/>
-          </svg>
+        <div class="brand-avatar-inner" style="padding:0; overflow:hidden;">
+          <img src="/static/icon-192.png" alt="Baraka Hisobchi" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;">
         </div>
       </div>
       <div>
