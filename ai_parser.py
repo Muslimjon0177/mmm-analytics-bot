@@ -49,6 +49,7 @@ Guruhdagi xabarlardan quyidagi 7 toifani ajratib, JSON formatida qaytarishing ke
 MUHIM QOIDALAR:
 - Narxlarni o'qishda: Agar valyuta UZS (so'm) bo'lsa va narx "170, 175, 180, 65, 320" kabi 1000 dan kichik sonlarda yozilgan bo'lsa, ularning orqasiga 3 ta nol qo'shib yoz (masalan: 170 -> 170000, 65 -> 65000)! Agar USD ($) bo'lsa 3 ta nol QO'SHMA (masalan: 50$ -> amount_usd: 50)!
 - Vergul qoidasi: Summa yoki dollar yozishda vergul (,) ishlatilsa, vergulni e'tiborsiz qoldirib olib tashla (masalan: 1,500$ -> 1500, 2,500,000 -> 2500000, (1,200$) -> 1200)!
+- KO'P QATORLI UZUN XABARLAR: Agar xabarda bir nechta qator, ro'yxat yoki bir nechta mijoz/tovar/rasxod/to'lov yozilgan bo'lsa, BOSHIDAN OXIRIGACHA HAR BIR QATORNI ALOHIDA RECORD QILIB QAYTAR! Hech bir qatorni tashlab ketma. Agar tepada sarlavha ('Rasxod:', 'Nasiya:', 'Pul keldi:') bo'lsa, ostidagi barcha qatorlarni o'sha toifada chiqar.
 - Umumiy summa (total_amount) = quantity * price (agar ikkalasi mavjud bo'lsa).
 - "1.5 mln", "1,5 million" -> 1500000; "500 ming" -> 500000.
 - Agar summa yoki ism aniq tushunarsiz bo'lsa, o'zingdan to'qima: noma'lum maydonni null qoldir.
@@ -81,7 +82,7 @@ def parse_with_gemini(text: str) -> Optional[Dict[str, Any]]:
     models = ['gemini-flash-lite-latest', 'gemini-3.8-flash', 'gemini-flash-latest']
     payload = {
         "contents": [{"parts": [{"text": f"{SYSTEM_PROMPT}\n\nXabar matni:\n\"\"\"{text}\"\"\""}]}],
-        "generationConfig": {"responseMimeType": "application/json"}
+        "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": 4096}
     }
     data = json.dumps(payload).encode("utf-8")
 
@@ -89,7 +90,7 @@ def parse_with_gemini(text: str) -> Optional[Dict[str, Any]]:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=12) as response:
+            with urllib.request.urlopen(req, timeout=20) as response:
                 result_json = json.loads(response.read().decode("utf-8"))
                 candidates = result_json.get("candidates", [])
                 if candidates:
@@ -172,10 +173,64 @@ def analyze_audio_message(audio_bytes: bytes, mime_type: str = "audio/ogg") -> D
         return res
     return {"is_relevant": False, "records": [], "source": "voice_ai_empty"}
 
+def _detect_section_header(line: str) -> Optional[str]:
+    """Agar qatorda raqam bo'lmasa va toifa sarlavhasi bo'lsa ('Rasxod:', 'Nasiya:'), toifani qaytaradi"""
+    if re.search(r'\d', line):
+        return None
+    low = line.lower().strip()
+    if any(k in low for k in ("rasxod", "rasxot", "xarajat", "chiqim")):
+        return "rasxod"
+    if any(k in low for k in ("uyga", "inkassatsiya")):
+        return "uyga"
+    if any(k in low for k in ("pul keldi", "to'lov", "tolov")):
+        return "pul_keldi"
+    if "nasiya" in low:
+        return "nasiya"
+    if any(k in low for k in ("naqd", "naxt")):
+        return "naqd"
+    if any(k in low for k in ("kelim", "kirim")):
+        return "kelim"
+    return None
+
 def fallback_regex_parser(text: str) -> Dict[str, Any]:
-    """Zaxira tahlilchi (Regex)"""
+    """Ko'p qatorli va bir qatorli xabarlar uchun to'liq zaxira tahlilchi (har bir qatorni o'qiydi)"""
+    lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+    if len(lines) > 1:
+        all_recs = []
+        section_cat = None
+        for ln in lines:
+            hdr = _detect_section_header(ln)
+            if hdr:
+                section_cat = hdr
+                continue
+            sub = _parse_single_line_regex(ln, default_cat=section_cat)
+            for r in sub.get("records", []):
+                all_recs.append(r)
+        if all_recs:
+            return {"is_relevant": True, "records": all_recs}
+    return _parse_single_line_regex(text)
+
+def _parse_single_line_regex(text: str, default_cat: Optional[str] = None) -> Dict[str, Any]:
+    """Bitta qator uchun zaxira tahlilchi (Regex)"""
     lower = text.lower()
     records = []
+
+    if default_cat in ("rasxod", "uyga") and not any(k in lower for k in ["rasxod", "rasxot", "xarajat", "chiqim", "uyga", "naqd", "naxt", "nasiya", "kelim", "pul keldi", "berdi"]):
+        m = re.search(r'(\d+[\d\s.,]*)\s*(mln|million|ming|\$|dollar|usd)?', lower)
+        is_usd = "$" in text or "dollar" in lower or "usd" in lower
+        amt = float(m.group(1).replace(" ", "").replace(",", "")) if m else 0
+        unit_kw = (m.group(2) or "") if m else ""
+        if not is_usd:
+            if unit_kw in ("mln", "million"):
+                amt *= 1_000_000
+            elif unit_kw == "ming" or (0 < amt < 1000):
+                amt *= 1000
+        if amt > 0:
+            return {"is_relevant": True, "records": [{
+                "category": default_cat, "item_name": text[:40].strip(), "quantity": None, "unit": None,
+                "price": None, "total_amount": None if is_usd else amt, "partner_name": None,
+                "currency": "USD" if is_usd else "UZS", "amount_usd": amt if is_usd else None
+            }]}
 
     # 0. Tovar qaytarish (vozvrat)
     if any(k in lower for k in ["qaytardi", "qaytarildi", "qaytib keldi", "vozvrat"]):
@@ -464,13 +519,25 @@ def _sanitize_ai_result(res: Dict[str, Any], original_text: str = "") -> Dict[st
     return ensured
 
 def analyze_message(text: str) -> Dict[str, Any]:
-    """Asosiy tahlil funksiyasi"""
+    """Asosiy tahlil funksiyasi (ko'p qatorli uzun xabarlarda ham birorta qatorni tashlab ketmaydi)"""
     if not text or len(text.strip()) < 2:
         return {"is_relevant": False, "records": []}
 
+    digit_lines = [ln.strip() for ln in text.splitlines() if ln.strip() and re.search(r'\d', ln)]
     res = parse_with_gemini(text)
     if res and isinstance(res, dict) and "records" in res:
-        return _sanitize_ai_result(res, text)
+        ai_out = _sanitize_ai_result(res, text)
+        # Agar uzun ko'p qatorli ro'yxatda AI faqat boshidagi 1-2 ta qatorni qaytargan bo'lsa,
+        # qator-ba-qator zaxira tahlilchini ham tekshirib to'liq ro'yxatni olamiz!
+        if len(digit_lines) >= 2 and len(ai_out.get("records", [])) < len(digit_lines):
+            fb = fallback_regex_parser(text)
+            if len(fb.get("records", [])) > len(ai_out.get("records", [])):
+                for rec in fb["records"]:
+                    if "payment_method" not in rec:
+                        rec["payment_method"] = "card" if (_has_card_marker(text) and rec.get("category") in ("naqd", "pul_keldi") and rec.get("currency") != "USD") else "cash"
+                fb["source"] = "multi_line_merged"
+                return fb
+        return ai_out
 
     fb = fallback_regex_parser(text)
     is_card = _has_card_marker(text)
