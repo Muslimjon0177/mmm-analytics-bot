@@ -739,6 +739,23 @@ def cmd_customer_link(message):
         lines.append(f"• <b>{html.escape(c['display_name'])}</b> (Qarz: {bal} so'm)\n  <code>{link}</code>")
     bot.send_message(message.chat.id, "\n".join(lines), disable_web_page_preview=True)
 
+@bot.message_handler(commands=['ilova', 'app_link'], func=lambda m: m.chat.type == 'private')
+def cmd_install_app_link(message):
+    """Admin uchun telefonga mustaqil ilova (PWA) qilib o'rnatish havolasi (mikrofon 1 marta so'raydi)"""
+    if not check_admin_or_reply(message): return
+    from webapp import make_app_login_token
+    base_url = (CURRENT_WEB_APP_URL or DEFAULT_RENDER_URL).rstrip("/")
+    install_url = f"{base_url}/install?k={make_app_login_token()}"
+    bot.send_message(
+        message.chat.id,
+        "📲 <b>MMM Analytics'ni telefonga mustaqil ILOVA qilib o'rnatish:</b>\n\n"
+        f"1️⃣ Ushbu maxfiy havolani <b>Chrome</b> (yoki Safari) da oching:\n<code>{install_url}</code>\n\n"
+        "2️⃣ Brauzer menyusidan (⋮) <b>«Ilovani o'rnatish»</b> (Add to Home screen) ni bosing.\n"
+        "3️⃣ O'rnatilgan ilovada <b>mikrofonga 1 marta ruxsat</b> bering — boshqa qayta-qayta so'ramaydi!\n\n"
+        "<i>⚠️ Bu havola sizning shaxsiy admin kalitingiz, begonalarga bermang.</i>",
+        disable_web_page_preview=True
+    )
+
 @bot.message_handler(commands=['hisobot', 'bugun'], func=lambda m: m.chat.type == 'private')
 def cmd_hisobot(message):
     if not check_admin_or_reply(message): return

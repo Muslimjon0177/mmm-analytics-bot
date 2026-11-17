@@ -443,10 +443,18 @@ let searchTimeout = null;
             if (adminCustContent) adminCustContent.style.display = isAdmin ? 'block' : 'none';
             if (guestRecLocked) guestRecLocked.style.display = isAdmin ? 'none' : 'block';
             if (adminRecContent) adminRecContent.style.display = isAdmin ? 'block' : 'none';
+            if (isAdmin && currentTab !== 'dashboard') {
+              if (labelDash) labelDash.innerText = 'Dashboard';
+              switchTab('dashboard');
+            }
           }
         })
         .catch(() => {});
     }
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 
     // Sahifa yuklanishi bilan ishga tushirish
 

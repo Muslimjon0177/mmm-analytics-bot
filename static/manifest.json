@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "MMM Analytics — Savdo & Ombor CRM",
+  "short_name": "MMM Analytics",
+  "description": "Savdo, nasiya, kassa va ovozli AI boshqaruv ilovasi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#06090F",
+  "theme_color": "#06090F",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

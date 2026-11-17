@@ -10,7 +10,7 @@ from collections import defaultdict
 from typing import Optional
 from urllib.parse import parse_qsl
 from datetime import datetime, timedelta, timezone
-from flask import Flask, jsonify, request, send_from_directory, send_file
+from flask import Flask, jsonify, request, send_from_directory, send_file, redirect, make_response
 import telebot
 from config import WEB_APP_PORT, BOT_MODE, WEBHOOK_SECRET, ENVIRONMENT, ADMIN_IDS, BOT_TOKEN
 from database import (
@@ -74,6 +74,19 @@ def set_bot_instance(bot: telebot.TeleBot):
 def index():
     """Telegram Mini App asosiy sahifasi"""
     return send_from_directory("static", "index.html")
+
+@app.route("/manifest.json")
+def pwa_manifest():
+    """PWA Manifest (Chrome / Android ilova sifatida o'rnatish uchun)"""
+    return send_from_directory("static", "manifest.json", mimetype="application/manifest+json")
+
+@app.route("/sw.js")
+def pwa_service_worker():
+    """PWA Service Worker (keshlash va offline barqarorlik)"""
+    resp = make_response(send_from_directory("static", "sw.js", mimetype="application/javascript"))
+    resp.headers["Service-Worker-Allowed"] = "/"
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
 
 @app.route("/health")
 def health():
@@ -140,13 +153,25 @@ def verify_init_data(init_data: str) -> Optional[dict]:
     except ValueError:
         return None
 
+def make_app_login_token() -> str:
+    """Admin uchun Chrome/PWA ilovasiga kirishning imzolangan kalitini yaratadi"""
+    secret = (BOT_TOKEN or "mmm-pwa-secret").encode("utf-8")
+    return hmac.new(secret, b"mmm_pwa_admin_v1", hashlib.sha256).hexdigest()[:24]
+
+def verify_app_cookie(req) -> bool:
+    tok = req.cookies.get("mmm_admin_session", "")
+    if not tok or not BOT_TOKEN:
+        return False
+    return hmac.compare_digest(tok, make_app_login_token())
+
 def get_request_user(req) -> Optional[dict]:
     init_data = req.headers.get("X-Telegram-Init-Data") or req.args.get("init_data") or ""
     return verify_init_data(init_data)
 
 def is_admin_request(req) -> bool:
-    """Admin faqat Telegram imzosi tasdiqlangan initData orqali aniqlanadi.
-    URL dagi ?uid= endi QABUL QILINMAYDI (uni har kim soxtalashtirishi mumkin edi)."""
+    """Admin Telegram imzoli initData YOKI imzolangan HttpOnly PWA cookie orqali aniqlanadi."""
+    if verify_app_cookie(req):
+        return True
     user = get_request_user(req)
     if not user:
         return False
@@ -155,14 +180,32 @@ def is_admin_request(req) -> bool:
     except (TypeError, ValueError):
         return False
 
+@app.route("/install")
+def pwa_install_login():
+    """Admin botdan olgan /ilova havolasi orqali brauzerda kirganda xavfsiz HttpOnly cookie o'rnatadi"""
+    k = (request.args.get("k") or "").strip()
+    if not k or not hmac.compare_digest(k, make_app_login_token()):
+        return "Noto'g'ri yoki eskirgan havola.", 403
+    resp = make_response(redirect("/"))
+    resp.set_cookie(
+        "mmm_admin_session",
+        make_app_login_token(),
+        max_age=30 * 24 * 3600,
+        httponly=True,
+        secure=(ENVIRONMENT == "production" or request.is_secure),
+        samesite="Lax",
+    )
+    return resp
+
 @app.route("/api/me")
 def api_me():
     """Mini App foydalanuvchining rolini serverdan bilib oladi"""
     user = get_request_user(request)
+    cookie_ok = verify_app_cookie(request)
     return jsonify({
-        "authenticated": bool(user),
+        "authenticated": bool(user) or cookie_ok,
         "is_admin": is_admin_request(request),
-        "first_name": (user or {}).get("first_name")
+        "first_name": (user or {}).get("first_name") or ("Muslimjon" if cookie_ok else None)
     })
 
 @app.route("/api/stats")
