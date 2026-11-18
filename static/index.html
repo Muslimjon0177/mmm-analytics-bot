@@ -193,6 +193,17 @@
         <div id="rec-card-line" style="display:none; margin-top:6px; font-size:11px; color:#38BDF8; background:rgba(56,189,248,0.08); padding:6px 10px; border-radius:8px;"></div>
       </div>
 
+      <!-- 2-REJIM: TO'G'RIDAN-TO'G'RI ILOVADAN XABAR KIRITISH VA TAHLIL -->
+      <div class="glass-card" id="direct-input-card" style="display:none; padding:14px; margin-bottom:14px; border:1px solid rgba(0,245,160,0.28);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <span style="font-size:12px; font-weight:800; color:#FFF;">✍️ Ilovadan To'g'ridan-to'g'ri Kiritish</span>
+          <span style="font-size:9px; color:#00F5A0; background:rgba(0,245,160,0.12); padding:2px 8px; border-radius:999px; font-weight:800;">Guruhsiz rejim</span>
+        </div>
+        <textarea id="direct-msg-input" rows="3" placeholder="Guruhga yozgandek kiriting (1 yoki ko'p qator):&#10;Ali aka 5 ta olma 170 dan&#10;Rasxod abed 150 ming&#10;Uyga ketyapti 2 mln" style="width:100%; background:#0B111E; border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:9px 11px; color:#FFF; font-size:12px; outline:none; resize:vertical; margin-bottom:8px;"></textarea>
+        <button id="direct-msg-btn" onclick="submitDirectMessage()" style="width:100%; padding:9px 12px; border-radius:10px; background:linear-gradient(135deg,#00F5A0,#00F2FE); border:none; color:#06090F; font-weight:900; font-size:12px; cursor:pointer;">⚡ Tahlil qilib Bazaga Saqlash</button>
+        <div id="direct-msg-status" style="font-size:11px; margin-top:7px; color:#94A3B8;"></div>
+      </div>
+
       <!-- GRAFIK -->
       <div class="glass-card chart-card">
         <div class="chart-title">
@@ -456,7 +467,7 @@
   </nav>
 
   <!-- JAVASCRIPT: INSTANT RENDER & ULTRA FAST LOGIC -->
-  <script src="/static/js/app.js?v=9" defer></script>
+  <script src="/static/js/app.js?v=11" defer></script>
 
   <!-- FLOATING AI VOICE ASSISTANT BUTTON -->
   <button onclick="openAiModal()" title="Ovozli AI Yordamchi" style="position:fixed; right:16px; bottom:116px; z-index:45; display:flex; align-items:center; gap:6px; padding:8px 13px; border-radius:999px; background:linear-gradient(135deg,#A855F7,#00F2FE); border:none; color:#06090F; font-weight:900; font-size:11px; cursor:pointer; box-shadow:0 4px 18px rgba(168,85,247,0.45);">

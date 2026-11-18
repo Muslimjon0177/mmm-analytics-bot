@@ -1,7 +1,7 @@
-const CACHE_NAME = 'mmm-analytics-v10';
+const CACHE_NAME = 'mmm-analytics-v11';
 const SHELL_URLS = [
   '/static/css/app.css?v=7',
-  '/static/js/app.js?v=9',
+  '/static/js/app.js?v=11',
   '/static/icon-192.png',
   '/static/icon-512.png',
   '/manifest.json'

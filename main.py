@@ -484,6 +484,9 @@ def replace_message_records(chat_id: int, message_id: int, new_text: str, sender
     return result
 
 def group_allowed(message) -> bool:
+    from database import get_setting
+    if (get_setting("input_mode", "dual") or "dual").lower() == "app_only":
+        return False
     return not ALLOWED_GROUP_IDS or message.chat.id in ALLOWED_GROUP_IDS
 
 @bot.message_handler(func=lambda m: m.chat.type in ['group', 'supergroup'], content_types=['text', 'photo', 'document'])

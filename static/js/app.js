@@ -399,6 +399,38 @@ let searchTimeout = null;
         .catch(() => { if (tg?.showAlert) tg.showAlert("❌ Tarmoq xatoligi. Qayta urinib ko'ring."); });
     }
 
+    async function submitDirectMessage() {
+      const inp = document.getElementById('direct-msg-input');
+      const btn = document.getElementById('direct-msg-btn');
+      const st = document.getElementById('direct-msg-status');
+      const text = (inp?.value || '').trim();
+      if (!text) return;
+      if (btn) btn.disabled = true;
+      if (st) { st.style.color = '#00F2FE'; st.innerText = '⚡ AI tahlil qilmoqda...'; }
+      try {
+        const res = await apiFetch('/api/parse-text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (inp) inp.value = '';
+          if (st) {
+            st.style.color = '#00F5A0';
+            st.innerText = `✅ ${data.count} ta yozuv tahlil qilinib bazaga saqlandi!`;
+          }
+          loadDashboardStats();
+        } else {
+          if (st) { st.style.color = '#FF3366'; st.innerText = '⚠️ ' + (data.error || 'Tahlil qilib bo\'lmadi'); }
+        }
+      } catch (e) {
+        if (st) { st.style.color = '#FF3366'; st.innerText = '⚠️ Serverga ulanishda xatolik'; }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
     function initApp() {
       const roleBadge = document.getElementById('user-role-badge');
       const labelDash = document.getElementById('label-nav-dashboard');
@@ -407,6 +439,8 @@ let searchTimeout = null;
       const adminCustContent = document.getElementById('admin-customers-content');
       const guestRecLocked = document.getElementById('guest-records-locked');
       const adminRecContent = document.getElementById('admin-records-content');
+      const directCard = document.getElementById('direct-input-card');
+      if (directCard) directCard.style.display = isAdmin ? 'block' : 'none';
 
       if (isAdmin) {
         if (roleBadge) roleBadge.innerText = '👑 Boshqaruvchi: Muslimjon';
@@ -443,6 +477,7 @@ let searchTimeout = null;
             if (adminCustContent) adminCustContent.style.display = isAdmin ? 'block' : 'none';
             if (guestRecLocked) guestRecLocked.style.display = isAdmin ? 'none' : 'block';
             if (adminRecContent) adminRecContent.style.display = isAdmin ? 'block' : 'none';
+            if (directCard) directCard.style.display = isAdmin ? 'block' : 'none';
             if (isAdmin && currentTab !== 'dashboard') {
               if (labelDash) labelDash.innerText = 'Dashboard';
               switchTab('dashboard');

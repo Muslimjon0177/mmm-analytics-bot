@@ -600,6 +600,7 @@ html.light-theme .kpi-sub {
   color: #475569 !important;
 }
 html.light-theme input,
+html.light-theme textarea,
 html.light-theme select,
 html.light-theme #ai-chat-box {
   background: #F8FAFC !important;

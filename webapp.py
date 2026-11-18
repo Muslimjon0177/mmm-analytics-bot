@@ -423,6 +423,65 @@ def api_rate():
     """Hozirgi dollar kursi"""
     return jsonify({"usd_rate": get_usd_rate()})
 
+@app.route("/api/parse-text", methods=["POST"])
+def api_parse_text():
+    """2-rejim: To'g'ridan-to'g'ri ilovaning o'ziga yozilgan matn/ro'yxatni AI orqali tahlil qilib bazaga saqlash"""
+    if not is_admin_request(request):
+        return jsonify({"error": "Ruxsat etilmagan"}), 403
+    payload = request.get_json(silent=True) or {}
+    text = (payload.get("text") or "").strip()
+    if not text:
+        return jsonify({"success": False, "error": "Matn bo'sh"}), 400
+    try:
+        from ai_parser import analyze_message
+        from database import get_all_customer_names
+        from customer_matcher import resolve_customer_name
+
+        result = analyze_message(text)
+        if not result.get("is_relevant") or not result.get("records"):
+            return jsonify({"success": False, "error": "Xabarda savdo, to'lov yoki rasxod topilmadi."}), 400
+
+        existing = get_all_customer_names()
+        saved = []
+        for rec in result["records"]:
+            cat = rec.get("category", "naqd")
+            raw_partner = rec.get("partner_name")
+            resolved_partner = raw_partner
+            if raw_partner and cat in ("nasiya", "pul_keldi", "qaytarish"):
+                match = resolve_customer_name(raw_partner, existing)
+                resolved_partner = match["resolved"]
+                if resolved_partner and resolved_partner not in existing:
+                    existing.append(resolved_partner)
+
+            rid = save_record(
+                category=cat,
+                item_name=rec.get("item_name"),
+                quantity=rec.get("quantity"),
+                unit=rec.get("unit"),
+                price=rec.get("price"),
+                total_amount=rec.get("total_amount"),
+                partner_name=resolved_partner,
+                currency=rec.get("currency", "UZS"),
+                amount_usd=rec.get("amount_usd"),
+                raw_message=text,
+                sender_name="Ilova (To'g'ridan-to'g'ri)",
+                payment_method=rec.get("payment_method", "cash"),
+            )
+            saved.append({
+                "id": rid,
+                "category": cat,
+                "partner_name": resolved_partner,
+                "item_name": rec.get("item_name"),
+                "total_amount": rec.get("total_amount"),
+                "currency": rec.get("currency", "UZS"),
+                "amount_usd": rec.get("amount_usd"),
+                "payment_method": rec.get("payment_method", "cash"),
+            })
+        return jsonify({"success": True, "count": len(saved), "records": saved})
+    except Exception as e:
+        logger.error(f"Ilovadan matn tahlilida xatolik: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route("/api/add-record", methods=["POST"])
 def api_add_record():
     """Mini App orqali yozuv kiritish (faqat admin)"""
